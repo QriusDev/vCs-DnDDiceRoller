@@ -71,18 +71,13 @@ $env:PATH        = "F:\tools\nodejs;F:\tools\git\cmd;F:\tools\cargo\bin;$env:PAT
   npm run tauri info
   ```
 
-- **Check Rust Backend:**
+- **Compile Self-Contained Desktop Binary (Standalone `.exe`):**
   ```powershell
-  cargo check --manifest-path src-tauri/Cargo.toml
+  npm run build:exe
   ```
+  This builds the frontend bundle and compiles `src-tauri/target/debug/dnd_dice_roller.exe` with all frontend assets embedded directly into the binary. You can double-click and run `dnd_dice_roller.exe` without running any dev server or localhost connection.
 
-- **Compile Desktop Binary:**
-  ```powershell
-  cargo build --manifest-path src-tauri/Cargo.toml
-  ```
-  Binary outputs to `src-tauri/target/debug/dnd_dice_roller.exe`.
-
-- **Launch Full Tauri Desktop Development Window:**
+- **Launch Full Tauri Desktop Development Window (Live HMR):**
   ```powershell
   npm run tauri dev
   ```

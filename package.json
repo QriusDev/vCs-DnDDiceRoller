@@ -12,7 +12,8 @@
     "test:watch": "vitest",
     "lint": "eslint .",
     "format": "prettier --write \"src/**/*.{ts,css,html,json}\"",
-    "format:check": "prettier --check \"src/**/*.{ts,css,html,json}\""
+    "format:check": "prettier --check \"src/**/*.{ts,css,html,json}\"",
+    "build:exe": "npm run build && cargo build --manifest-path src-tauri/Cargo.toml"
   },
   "dependencies": {
     "@tauri-apps/api": "^2.12.0",
