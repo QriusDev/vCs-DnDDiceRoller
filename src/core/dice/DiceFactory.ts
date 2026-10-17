@@ -1,5 +1,7 @@
-import type { DiceType, DieInstance } from "@/types";
+import type { DiceType, DiceVisualRequest, DieInstance } from "@/types";
 import { DICE_CONFIGS } from "@/config/diceConfig";
+import { DieMesh } from "@/rendering/geometries/DieMesh";
+import type { DiceMaterialManager } from "@/rendering/materials/DiceMaterialManager";
 
 export class DiceFactory {
   static createDie(type: DiceType, customColor?: string): DieInstance {
@@ -15,5 +17,12 @@ export class DiceFactory {
       appearance,
       createdAt: Date.now(),
     };
+  }
+
+  static createVisualDie(
+    request: DiceVisualRequest,
+    materialManager: DiceMaterialManager
+  ): DieMesh {
+    return new DieMesh(request, materialManager);
   }
 }

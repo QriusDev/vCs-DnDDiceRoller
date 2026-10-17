@@ -1,5 +1,6 @@
 import type { AppState } from "@/core/state/AppState";
-import type { VisualThemeId } from "@/types";
+import type { DiceGeometryStyle, DiceThemeId, VisualThemeId } from "@/types";
+import { DICE_THEMES } from "@/config/themeConfig";
 
 export class SettingsModal {
   readonly element: HTMLElement;
@@ -19,6 +20,7 @@ export class SettingsModal {
 
   private render(): void {
     const settings = this.appState.getSettings();
+    const diceThemes = Object.values(DICE_THEMES);
 
     this.element.innerHTML = `
       <div class="settings-modal-dialog glass-panel" role="dialog" aria-modal="true" aria-labelledby="settingsTitle">
@@ -31,23 +33,76 @@ export class SettingsModal {
         </div>
 
         <div class="settings-body">
-          <!-- Visual Theme Section -->
+          <!-- 3D Dice Geometry Style Section (Phase 2) -->
           <section class="settings-section">
-            <h3 class="section-title">Visual Theme</h3>
-            <p class="section-desc">Select the aesthetic appearance of the dice tray and tabletop environment.</p>
+            <h3 class="section-title">3D Dice Geometry Style</h3>
+            <p class="section-desc">Select the physical edge and corner profile for all polyhedral dice.</p>
+            <div class="style-cards-grid">
+              <label class="style-card-option ${settings.diceGeometryStyle === "sharp" ? "selected" : ""}">
+                <input type="radio" name="dice-geom-style" value="sharp" ${settings.diceGeometryStyle === "sharp" ? "checked" : ""}>
+                <div class="style-card-content">
+                  <span class="style-card-icon">💎</span>
+                  <div class="style-card-text">
+                    <strong>Sharp Edge</strong>
+                    <span>Crisp artisan resin silhouettes, flat facet faces</span>
+                  </div>
+                </div>
+              </label>
+
+              <label class="style-card-option ${settings.diceGeometryStyle === "rounded" ? "selected" : ""}">
+                <input type="radio" name="dice-geom-style" value="rounded" ${settings.diceGeometryStyle === "rounded" ? "checked" : ""}>
+                <div class="style-card-content">
+                  <span class="style-card-icon">🎲</span>
+                  <div class="style-card-text">
+                    <strong>Rounded / Soft Edge</strong>
+                    <span>Chamfered beveled edges, softened corners for smooth tumbling</span>
+                  </div>
+                </div>
+              </label>
+            </div>
+          </section>
+
+          <!-- 3D Dice Themes Section (Phase 2) -->
+          <section class="settings-section">
+            <h3 class="section-title">Dice Materials & Themes</h3>
+            <p class="section-desc">Physically based PBR materials and procedural texturing presets.</p>
+            <div class="dice-themes-grid">
+              ${diceThemes
+                .map(
+                  (theme) => `
+                <label class="dice-theme-option ${settings.diceTheme === theme.id ? "selected" : ""}">
+                  <input type="radio" name="dice-theme-preset" value="${theme.id}" ${settings.diceTheme === theme.id ? "checked" : ""}>
+                  <div class="dice-theme-card">
+                    <div class="swatch-container">
+                      <span class="swatch-body" style="background-color: ${theme.bodyColor}"></span>
+                      <span class="swatch-number" style="background-color: ${theme.numberColor}"></span>
+                    </div>
+                    <span class="dice-theme-name">${theme.label}</span>
+                  </div>
+                </label>
+              `
+                )
+                .join("")}
+            </div>
+          </section>
+
+          <!-- Tabletop Visual Theme Section -->
+          <section class="settings-section">
+            <h3 class="section-title">Tabletop Felt Theme</h3>
+            <p class="section-desc">Select the aesthetic appearance of the dice tray felt surface.</p>
             <div class="theme-options">
               <label class="theme-option ${settings.theme === "dark-slate" ? "selected" : ""}">
                 <input type="radio" name="app-theme" value="dark-slate" ${settings.theme === "dark-slate" ? "checked" : ""}>
                 <div class="theme-card">
                   <span class="theme-preview slate-preview"></span>
-                  <span class="theme-name">Dark Slate (Default)</span>
+                  <span class="theme-name">Dark Slate</span>
                 </div>
               </label>
               <label class="theme-option ${settings.theme === "classic-felt" ? "selected" : ""}">
                 <input type="radio" name="app-theme" value="classic-felt" ${settings.theme === "classic-felt" ? "checked" : ""}>
                 <div class="theme-card">
                   <span class="theme-preview felt-preview"></span>
-                  <span class="theme-name">Classic Emerald Felt</span>
+                  <span class="theme-name">Emerald Felt</span>
                 </div>
               </label>
               <label class="theme-option ${settings.theme === "obsidian-gold" ? "selected" : ""}">
@@ -105,9 +160,9 @@ export class SettingsModal {
           <section class="settings-section">
             <h3 class="section-title">Phase Roadmap & Architecture</h3>
             <div class="roadmap-box">
-              <div class="roadmap-item active"><strong>Phase 1:</strong> Application Foundation & 3D Tray Shell (Active)</div>
-              <div class="roadmap-item"><strong>Phase 2:</strong> Polyhedral 3D Dice Geometries & Face Reading</div>
-              <div class="roadmap-item"><strong>Phase 3:</strong> Rigid Body Physics Integration & Collisions</div>
+              <div class="roadmap-item done">✔ <strong>Phase 1:</strong> Application Foundation & 3D Tray Shell</div>
+              <div class="roadmap-item active">✨ <strong>Phase 2:</strong> Polyhedral 3D Dice Geometries, Numbering & Materials (Active)</div>
+              <div class="roadmap-item"><strong>Phase 3:</strong> Rigid Body Physics Dynamics & Collisions</div>
               <div class="roadmap-item"><strong>Phase 4:</strong> Procedural Audio Synthesis & Visual Themes</div>
               <div class="roadmap-item"><strong>Phase 5:</strong> Portable Executable Distribution & Polish</div>
             </div>
@@ -137,17 +192,40 @@ export class SettingsModal {
       }
     });
 
-    // Theme change
+    // Change listeners
     this.element.addEventListener("change", (e) => {
       const target = e.target as HTMLInputElement;
+
+      if (target.name === "dice-geom-style") {
+        const style = target.value as DiceGeometryStyle;
+        this.appState.setDiceGeometryStyle(style);
+        this.render();
+        return;
+      }
+
+      if (target.name === "dice-theme-preset") {
+        const theme = target.value as DiceThemeId;
+        this.appState.setDiceTheme(theme);
+        this.render();
+        return;
+      }
+
       if (target.name === "app-theme") {
         const theme = target.value as VisualThemeId;
         this.appState.updateSettings((s) => ({ ...s, theme }));
         this.render();
+        return;
+      }
+
+      if (target.id === "collisionSoundToggle") {
+        this.appState.updateSettings((s) => ({
+          ...s,
+          audio: { ...s.audio, collisionSoundsEnabled: target.checked },
+        }));
       }
     });
 
-    // Master volume slider
+    // Master volume & physics sliders
     this.element.addEventListener("input", (e) => {
       const target = e.target as HTMLInputElement;
       if (target.id === "masterVolumeInput") {
@@ -177,17 +255,6 @@ export class SettingsModal {
         this.appState.updateSettings((s) => ({
           ...s,
           physics: { ...s.physics, defaultFriction: val },
-        }));
-      }
-    });
-
-    // Collision sound toggle
-    this.element.addEventListener("change", (e) => {
-      const target = e.target as HTMLInputElement;
-      if (target.id === "collisionSoundToggle") {
-        this.appState.updateSettings((s) => ({
-          ...s,
-          audio: { ...s.audio, collisionSoundsEnabled: target.checked },
         }));
       }
     });
@@ -230,8 +297,8 @@ export class SettingsModal {
       }
       .settings-modal-dialog {
         width: 100%;
-        max-width: 580px;
-        max-height: 85vh;
+        max-width: 620px;
+        max-height: 88vh;
         display: flex;
         flex-direction: column;
         background: var(--color-bg-surface);
@@ -274,7 +341,7 @@ export class SettingsModal {
         overflow-y: auto;
         display: flex;
         flex-direction: column;
-        gap: var(--space-6);
+        gap: var(--space-5);
       }
       .settings-section {
         display: flex;
@@ -292,6 +359,96 @@ export class SettingsModal {
         font-size: var(--font-size-xs);
         color: var(--color-text-muted);
         margin-bottom: var(--space-2);
+      }
+      .style-cards-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: var(--space-3);
+      }
+      .style-card-option input {
+        display: none;
+      }
+      .style-card-content {
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        gap: var(--space-3);
+        padding: var(--space-3);
+        background: var(--color-bg-surface-elevated);
+        border: 2px solid transparent;
+        border-radius: var(--radius-md);
+        transition: all var(--transition-fast);
+      }
+      .style-card-option.selected .style-card-content {
+        border-color: var(--color-accent-gold);
+        background: rgba(217, 119, 6, 0.12);
+      }
+      .style-card-icon {
+        font-size: 1.6rem;
+      }
+      .style-card-text {
+        display: flex;
+        flex-direction: column;
+        gap: 2px;
+      }
+      .style-card-text strong {
+        font-size: var(--font-size-sm);
+        color: var(--color-text-primary);
+      }
+      .style-card-text span {
+        font-size: 0.68rem;
+        color: var(--color-text-muted);
+        line-height: 1.3;
+      }
+      .dice-themes-grid {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: var(--space-3);
+      }
+      .dice-theme-option input {
+        display: none;
+      }
+      .dice-theme-card {
+        cursor: pointer;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 8px;
+        padding: var(--space-3);
+        border-radius: var(--radius-md);
+        background: var(--color-bg-surface-elevated);
+        border: 2px solid transparent;
+        transition: all var(--transition-fast);
+      }
+      .dice-theme-option.selected .dice-theme-card {
+        border-color: var(--color-accent-gold);
+        background: rgba(217, 119, 6, 0.12);
+      }
+      .swatch-container {
+        position: relative;
+        width: 38px;
+        height: 24px;
+        border-radius: var(--radius-sm);
+        overflow: hidden;
+        border: 1px solid rgba(255, 255, 255, 0.2);
+      }
+      .swatch-body {
+        position: absolute;
+        inset: 0;
+      }
+      .swatch-number {
+        position: absolute;
+        right: 4px;
+        bottom: 4px;
+        width: 10px;
+        height: 10px;
+        border-radius: var(--radius-full);
+        border: 1px solid rgba(0, 0, 0, 0.5);
+      }
+      .dice-theme-name {
+        font-size: 0.72rem;
+        font-weight: 600;
+        text-align: center;
       }
       .theme-options {
         display: grid;
@@ -365,6 +522,9 @@ export class SettingsModal {
       }
       .roadmap-item {
         color: var(--color-text-muted);
+      }
+      .roadmap-item.done {
+        color: var(--color-accent-emerald);
       }
       .roadmap-item.active {
         color: var(--color-accent-gold);

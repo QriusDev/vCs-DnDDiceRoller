@@ -74,6 +74,17 @@ export class App {
 
       // 3. Initialize Three.js 3D Scene
       this.sceneManager = new SceneManager(this.viewportEl, this.appState.getSettings());
+
+      // 4. React to Theme and Style updates in real-time
+      this.appState.onSettingsChange((newSettings, oldSettings) => {
+        if (!this.sceneManager) return;
+        if (newSettings.diceGeometryStyle !== oldSettings.diceGeometryStyle) {
+          this.sceneManager.updateGeometryStyle(newSettings.diceGeometryStyle);
+        }
+        if (newSettings.diceTheme !== oldSettings.diceTheme) {
+          this.sceneManager.updateTheme(newSettings.diceTheme);
+        }
+      });
     } catch (err) {
       console.error("Critical failure during App initialization:", err);
       this.renderErrorFallback(err instanceof Error ? err.message : String(err));

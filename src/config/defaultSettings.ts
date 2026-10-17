@@ -2,6 +2,8 @@ import type { AppSettings } from "@/types";
 
 export const DEFAULT_SETTINGS: AppSettings = {
   theme: "dark-slate",
+  diceTheme: "obsidian-gold",
+  diceGeometryStyle: "sharp",
   audio: {
     masterVolume: 0.8,
     sfxVolume: 1.0,

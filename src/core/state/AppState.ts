@@ -1,7 +1,9 @@
-import type {
+import {
   AppSettings,
   DicePoolState,
   DiceType,
+  DiceThemeId,
+  DiceGeometryStyle,
   DieInstance,
   RollHistoryEntry,
   RollState,
@@ -57,6 +59,22 @@ export class AppState {
 
   onSettingsChange(listener: StateListener<AppSettings>): () => void {
     return this.subscribe("settings", listener);
+  }
+
+  getDiceTheme(): DiceThemeId {
+    return this.settings.diceTheme || "obsidian-gold";
+  }
+
+  setDiceTheme(theme: DiceThemeId): void {
+    this.updateSettings((s) => ({ ...s, diceTheme: theme }));
+  }
+
+  getDiceGeometryStyle(): DiceGeometryStyle {
+    return this.settings.diceGeometryStyle || "sharp";
+  }
+
+  setDiceGeometryStyle(style: DiceGeometryStyle): void {
+    this.updateSettings((s) => ({ ...s, diceGeometryStyle: style }));
   }
 
   // --- Dice Pool ---

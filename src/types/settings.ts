@@ -1,4 +1,5 @@
 import type { PhysicsConfig } from "./physics";
+import type { DiceThemeId, DiceGeometryStyle } from "./dice";
 
 export type VisualThemeId = "dark-slate" | "classic-felt" | "obsidian-gold";
 
@@ -18,6 +19,8 @@ export interface RenderingPreferences {
 
 export interface AppSettings {
   theme: VisualThemeId;
+  diceTheme: DiceThemeId;
+  diceGeometryStyle: DiceGeometryStyle;
   audio: AudioPreferences;
   physics: PhysicsConfig;
   rendering: RenderingPreferences;

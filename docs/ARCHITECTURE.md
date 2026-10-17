@@ -84,10 +84,43 @@ flowchart TD
 
 ---
 
-## 4. Resource Lifecycle & Disposal
+## 4. 3D Dice Geometry & Rendering Architecture (Phase 2)
+
+### 4.1 Exact Mathematical Polyhedra (`PolyhedronData.ts`)
+Each die is constructed from analytical geometry with normalized outward-facing counter-clockwise (CCW) face winding:
+- **D4 (Tetrahedron):** 4 equilateral triangular faces formed by alternating vertices of a cube.
+- **D6 (Hexahedron):** 6 square faces.
+- **D8 (Octahedron):** 8 equilateral triangular faces on coordinate axes.
+- **D10 (Pentagonal Trapezohedron):** Genuine 10-faced dual of a pentagonal antiprism with congruent deltoid (kite) faces. Planarity is maintained mathematically using the precise height ratio $H/h = 5 + 2\sqrt{5} \approx 9.472136$, ensuring coplanar kite quadrilaterals with zero non-planar warping (tetrahedron volume $< 10^{-4}$).
+- **D12 (Dodecahedron):** 12 regular pentagonal faces derived from golden ratio coordinates $(\pm 1, \pm 1, \pm 1)$, $(0, \pm \phi, \pm 1/\phi)$, $(\pm 1/\phi, 0, \pm \phi)$, and $(\pm \phi, \pm 1/\phi, 0)$.
+- **D20 (Icosahedron):** 20 equilateral triangular faces derived from 3 orthogonal golden rectangles.
+
+### 4.2 Comprehensive Metadata & Collision Preparation
+Every die exposes `DieGeometryMetadata` containing:
+- Logical face identifiers, face numeric values, local-space outward face normals, centroids, vertex positions, local bounding radius, and physics hull vertices/faces ready for Cannon-es `ConvexPolyhedron` instantiation in Phase 3.
+- `DieMesh.getUpwardFace(worldUp)` evaluates $\max_i (\mathbf{R} \cdot \mathbf{n}_i \cdot \mathbf{u}_{\text{world}})$ using the die's world rotation matrix $\mathbf{R}$, enabling instant and mathematically robust face-up detection.
+
+### 4.3 Dual Geometry Styles (`DiceGeometryBuilder.ts`)
+- **Sharp Edge Style:** Flat, crisp facets targeting artisan resin dice.
+- **Rounded / Soft Edge Style:** Real geometric edge quads and corner fans computed by insetting face vertices by 14% toward each face centroid. Edge quads bridge adjacent face boundaries and corner fans cap vertices, providing smooth tumbling contours without relying on lighting normal tricks.
+
+### 4.4 Procedural Texture Atlas Pipeline (`DiceTextureGenerator.ts`)
+- Procedural HTML5 Canvas atlas generation creates crisp, high-resolution textures without external image file overhead.
+- Generates themed backdrops (polished marble resin, obsidian gold flecks, translucent amethyst gem, cyber neon grid lines, crimson dragon scales, walnut wood grain).
+- Renders numerals with recessed drop shadows, crisp contrast, and bottom underline dots on ambiguous '6' and '9' numerals.
+- Texture mapping projects face vertices onto atlas cells using face tangent and bitangent local coordinate frames, guaranteeing distortion-free rendering across triangles, kites, squares, and pentagons.
+
+### 4.5 PBR Materials & Theming (`DiceMaterialManager.ts`, `themeConfig.ts`)
+- Pre-configured PBR presets: `classic-ivory`, `obsidian-gold`, `royal-purple-gem`, `cyber-neon`, `crimson-dragon`, and `walnut-wood`.
+- Supports custom user body and numeral color overrides.
+- Implements an LRU-style cache key system to prevent duplicate texture or material allocations.
+
+---
+
+## 5. Resource Lifecycle & Disposal
 
 To ensure zero memory leaks and crash resistance in long-running desktop sessions:
-- Geometries and materials created by `MaterialFactory`, `TrayMesh`, and `SceneManager` are explicitly tracked and freed via `dispose()`.
+- Geometries, materials, and textures created by `MaterialFactory`, `DiceMaterialManager`, `TrayMesh`, and `SceneManager` are explicitly tracked and freed via `dispose()`.
 - The WebGL rendering loop cleanly cancels `requestAnimationFrame`.
 - Window resize listeners use a `ResizeObserver` disconnected upon application unmount.
 - Web Audio contexts in `AudioManager` are cleanly closed upon disposal.

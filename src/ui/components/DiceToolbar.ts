@@ -1,11 +1,12 @@
 import type { AppState } from "@/core/state/AppState";
 import { DICE_CONFIGS } from "@/config/diceConfig";
-import type { DiceType } from "@/types";
+import { DICE_THEMES } from "@/config/themeConfig";
+import type { DiceGeometryStyle, DiceThemeId, DiceType } from "@/types";
 
 export class DiceToolbar {
   readonly element: HTMLElement;
   private readonly appState: AppState;
-  private unsubscribe: (() => void) | null = null;
+  private unsubs: (() => void)[] = [];
 
   constructor(appState: AppState) {
     this.appState = appState;
@@ -16,19 +17,26 @@ export class DiceToolbar {
     this.attachStyles();
     this.setupListeners();
 
-    this.unsubscribe = this.appState.onDicePoolChange(() => {
-      this.updateCounts();
-    });
+    this.unsubs.push(
+      this.appState.onDicePoolChange(() => {
+        this.updateCounts();
+      }),
+      this.appState.onSettingsChange((settings) => {
+        this.updateActiveToggles(settings.diceGeometryStyle, settings.diceTheme);
+      })
+    );
   }
 
   private render(): void {
     const diceTypes: DiceType[] = ["d4", "d6", "d8", "d10", "d12", "d20"];
     const pool = this.appState.getDicePoolState();
+    const currentStyle = this.appState.getDiceGeometryStyle();
+    const currentTheme = this.appState.getDiceTheme();
 
     this.element.innerHTML = `
       <div class="toolbar-label">
         <span class="label-title">DICE TRAY SELECTOR</span>
-        <span class="label-hint">Left-click: +1 • Right-click: -1</span>
+        <span class="label-hint">Left-click: +1 • Right-click: -1 • Drag dice to rotate</span>
       </div>
       <div class="dice-buttons-group">
         ${diceTypes
@@ -54,7 +62,24 @@ export class DiceToolbar {
           })
           .join("")}
       </div>
-      <div class="toolbar-actions">
+      <div class="toolbar-controls-right">
+        <!-- Style Toggle -->
+        <div class="style-toggle-group" title="Switch 3D geometric style between Sharp and Rounded edges">
+          <button class="style-btn ${currentStyle === "sharp" ? "active" : ""}" data-style="sharp" type="button">Sharp</button>
+          <button class="style-btn ${currentStyle === "rounded" ? "active" : ""}" data-style="rounded" type="button">Rounded</button>
+        </div>
+
+        <!-- Theme Selector -->
+        <select class="theme-select-input" id="quickThemeSelect" title="Select dice material and texture theme">
+          ${Object.values(DICE_THEMES)
+            .map(
+              (t) => `
+            <option value="${t.id}" ${t.id === currentTheme ? "selected" : ""}>${t.label}</option>
+          `
+            )
+            .join("")}
+        </select>
+
         <button class="quick-clear-btn" type="button" title="Clear all dice from the tray">
           Clear
         </button>
@@ -80,11 +105,19 @@ export class DiceToolbar {
   }
 
   private setupListeners(): void {
-    // Left click to add die
+    // Left click handlers
     this.element.addEventListener("click", (e) => {
       const target = e.target as HTMLElement;
+
       if (target.closest(".quick-clear-btn")) {
         this.appState.clearDicePool();
+        return;
+      }
+
+      const styleBtn = target.closest<HTMLButtonElement>(".style-btn");
+      if (styleBtn && styleBtn.dataset.style) {
+        const style = styleBtn.dataset.style as DiceGeometryStyle;
+        this.appState.setDiceGeometryStyle(style);
         return;
       }
 
@@ -93,6 +126,15 @@ export class DiceToolbar {
       const type = btn.dataset.type as DiceType;
       if (type) {
         this.appState.addDieToPool(type);
+      }
+    });
+
+    // Theme selector change
+    this.element.addEventListener("change", (e) => {
+      const target = e.target as HTMLSelectElement;
+      if (target.id === "quickThemeSelect") {
+        const theme = target.value as DiceThemeId;
+        this.appState.setDiceTheme(theme);
       }
     });
 
@@ -122,6 +164,22 @@ export class DiceToolbar {
         badge.classList.remove("has-dice");
       }
     });
+  }
+
+  private updateActiveToggles(style: DiceGeometryStyle, theme: DiceThemeId): void {
+    const styleBtns = this.element.querySelectorAll<HTMLButtonElement>(".style-btn");
+    styleBtns.forEach((btn) => {
+      if (btn.dataset.style === style) {
+        btn.classList.add("active");
+      } else {
+        btn.classList.remove("active");
+      }
+    });
+
+    const select = this.element.querySelector<HTMLSelectElement>("#quickThemeSelect");
+    if (select) {
+      select.value = theme;
+    }
   }
 
   private attachStyles(): void {
@@ -154,7 +212,7 @@ export class DiceToolbar {
       .dice-buttons-group {
         display: flex;
         align-items: center;
-        gap: var(--space-3);
+        gap: var(--space-2);
       }
       .dice-btn {
         display: flex;
@@ -163,7 +221,7 @@ export class DiceToolbar {
         background: var(--color-bg-surface);
         border: 1px solid var(--color-border-default);
         border-radius: var(--radius-md);
-        padding: 6px 14px;
+        padding: 5px 12px;
         transition: transform var(--transition-fast), border-color var(--transition-fast), box-shadow var(--transition-fast);
       }
       .dice-btn:hover {
@@ -209,8 +267,51 @@ export class DiceToolbar {
         color: #000;
         box-shadow: 0 0 6px rgba(217, 119, 6, 0.4);
       }
+      .toolbar-controls-right {
+        display: flex;
+        align-items: center;
+        gap: var(--space-3);
+      }
+      .style-toggle-group {
+        display: flex;
+        border: 1px solid var(--color-border-default);
+        border-radius: var(--radius-md);
+        overflow: hidden;
+        background: var(--color-bg-surface);
+      }
+      .style-btn {
+        padding: 5px 10px;
+        font-size: var(--font-size-xs);
+        font-weight: 600;
+        color: var(--color-text-secondary);
+        transition: all var(--transition-fast);
+      }
+      .style-btn:hover {
+        background: var(--color-bg-surface-elevated);
+        color: var(--color-text-primary);
+      }
+      .style-btn.active {
+        background: var(--color-accent-gold);
+        color: #000;
+        font-weight: 700;
+      }
+      .theme-select-input {
+        background: var(--color-bg-surface);
+        color: var(--color-text-primary);
+        border: 1px solid var(--color-border-default);
+        border-radius: var(--radius-md);
+        padding: 5px 10px;
+        font-size: var(--font-size-xs);
+        font-family: inherit;
+        outline: none;
+        cursor: pointer;
+        transition: border-color var(--transition-fast);
+      }
+      .theme-select-input:hover, .theme-select-input:focus {
+        border-color: var(--color-accent-gold);
+      }
       .quick-clear-btn {
-        padding: 6px 12px;
+        padding: 5px 12px;
         font-size: var(--font-size-xs);
         font-weight: 600;
         color: var(--color-text-secondary);
@@ -228,9 +329,9 @@ export class DiceToolbar {
   }
 
   dispose(): void {
-    if (this.unsubscribe) {
-      this.unsubscribe();
-      this.unsubscribe = null;
+    for (const unsub of this.unsubs) {
+      unsub();
     }
+    this.unsubs = [];
   }
 }
