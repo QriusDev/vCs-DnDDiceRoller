@@ -93,6 +93,7 @@ export class HelpModal {
         justify-content: center;
         z-index: 1000;
         padding: var(--space-4);
+        overflow-y: auto;
       }
       .help-modal-backdrop[hidden] {
         display: none !important;
@@ -100,14 +101,18 @@ export class HelpModal {
       .help-modal-dialog {
         width: 100%;
         max-width: 520px;
+        max-height: min(88vh, calc(100vh - 32px));
+        margin: auto;
         display: flex;
         flex-direction: column;
         background: var(--color-bg-surface);
         border: 1px solid var(--color-border-default);
         border-radius: var(--radius-lg);
         box-shadow: var(--shadow-lg);
+        overflow: hidden;
       }
       .help-header {
+        flex-shrink: 0;
         display: flex;
         align-items: center;
         justify-content: space-between;
@@ -135,9 +140,29 @@ export class HelpModal {
       }
       .help-body {
         padding: var(--space-5);
+        overflow-y: auto;
+        overflow-x: hidden;
+        flex: 1 1 auto;
+        min-height: 0;
         display: flex;
         flex-direction: column;
         gap: var(--space-4);
+        scrollbar-width: thin;
+        scrollbar-color: var(--color-border-hover) var(--color-bg-surface-elevated);
+      }
+      .help-body::-webkit-scrollbar {
+        width: 8px;
+      }
+      .help-body::-webkit-scrollbar-track {
+        background: var(--color-bg-surface-elevated);
+        border-radius: var(--radius-full);
+      }
+      .help-body::-webkit-scrollbar-thumb {
+        background: var(--color-border-hover);
+        border-radius: var(--radius-full);
+      }
+      .help-body::-webkit-scrollbar-thumb:hover {
+        background: var(--color-accent-gold);
       }
       .help-section-title {
         font-size: var(--font-size-sm);
@@ -159,6 +184,7 @@ export class HelpModal {
         line-height: 1.6;
       }
       .help-footer {
+        flex-shrink: 0;
         padding: var(--space-4) var(--space-5);
         border-top: 1px solid var(--color-border-subtle);
         display: flex;

@@ -291,6 +291,7 @@ export class SettingsModal {
         justify-content: center;
         z-index: 1000;
         padding: var(--space-4);
+        overflow-y: auto;
       }
       .settings-modal-backdrop[hidden] {
         display: none !important;
@@ -298,7 +299,8 @@ export class SettingsModal {
       .settings-modal-dialog {
         width: 100%;
         max-width: 620px;
-        max-height: 88vh;
+        max-height: min(88vh, calc(100vh - 32px));
+        margin: auto;
         display: flex;
         flex-direction: column;
         background: var(--color-bg-surface);
@@ -308,6 +310,7 @@ export class SettingsModal {
         overflow: hidden;
       }
       .settings-header {
+        flex-shrink: 0;
         display: flex;
         align-items: center;
         justify-content: space-between;
@@ -339,9 +342,28 @@ export class SettingsModal {
       .settings-body {
         padding: var(--space-5);
         overflow-y: auto;
+        overflow-x: hidden;
+        flex: 1 1 auto;
+        min-height: 0;
         display: flex;
         flex-direction: column;
         gap: var(--space-5);
+        scrollbar-width: thin;
+        scrollbar-color: var(--color-border-hover) var(--color-bg-surface-elevated);
+      }
+      .settings-body::-webkit-scrollbar {
+        width: 8px;
+      }
+      .settings-body::-webkit-scrollbar-track {
+        background: var(--color-bg-surface-elevated);
+        border-radius: var(--radius-full);
+      }
+      .settings-body::-webkit-scrollbar-thumb {
+        background: var(--color-border-hover);
+        border-radius: var(--radius-full);
+      }
+      .settings-body::-webkit-scrollbar-thumb:hover {
+        background: var(--color-accent-gold);
       }
       .settings-section {
         display: flex;
@@ -530,6 +552,7 @@ export class SettingsModal {
         color: var(--color-accent-gold);
       }
       .settings-footer {
+        flex-shrink: 0;
         padding: var(--space-4) var(--space-5);
         border-top: 1px solid var(--color-border-subtle);
         display: flex;
