@@ -107,3 +107,7 @@ button:disabled {
 [data-tooltip] {
   position: relative;
 }
+
+[hidden] {
+  display: none !important;
+}

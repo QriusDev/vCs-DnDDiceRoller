@@ -128,6 +128,9 @@ export class HistoryDrawer {
         justify-content: flex-end;
         z-index: 1000;
       }
+      .history-drawer-backdrop[hidden] {
+        display: none !important;
+      }
       .history-drawer-panel {
         width: 100%;
         max-width: 420px;

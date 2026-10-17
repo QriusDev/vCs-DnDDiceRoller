@@ -225,6 +225,9 @@ export class SettingsModal {
         z-index: 1000;
         padding: var(--space-4);
       }
+      .settings-modal-backdrop[hidden] {
+        display: none !important;
+      }
       .settings-modal-dialog {
         width: 100%;
         max-width: 580px;

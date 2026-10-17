@@ -94,6 +94,9 @@ export class HelpModal {
         z-index: 1000;
         padding: var(--space-4);
       }
+      .help-modal-backdrop[hidden] {
+        display: none !important;
+      }
       .help-modal-dialog {
         width: 100%;
         max-width: 520px;
