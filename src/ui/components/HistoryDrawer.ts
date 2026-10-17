@@ -116,7 +116,9 @@ export class HistoryDrawer {
   }
 
   private attachStyles(): void {
+    if (document.getElementById("history-drawer-styles")) return;
     const style = document.createElement("style");
+    style.id = "history-drawer-styles";
     style.textContent = `
       .history-drawer-backdrop {
         position: fixed;
@@ -257,6 +259,6 @@ export class HistoryDrawer {
         color: #fb7185;
       }
     `;
-    this.element.appendChild(style);
+    document.head.appendChild(style);
   }
 }

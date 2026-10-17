@@ -106,7 +106,9 @@ export class ResultHud {
   }
 
   private attachStyles(): void {
+    if (document.getElementById("result-hud-styles")) return;
     const style = document.createElement("style");
+    style.id = "result-hud-styles";
     style.textContent = `
       .result-hud {
         position: absolute;
@@ -261,7 +263,7 @@ export class ResultHud {
         padding: var(--space-2) 0;
       }
     `;
-    this.element.appendChild(style);
+    document.head.appendChild(style);
   }
 
   dispose(): void {

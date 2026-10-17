@@ -279,7 +279,9 @@ export class SettingsModal {
   }
 
   private attachStyles(): void {
+    if (document.getElementById("settings-modal-styles")) return;
     const style = document.createElement("style");
+    style.id = "settings-modal-styles";
     style.textContent = `
       .settings-modal-backdrop {
         position: fixed;
@@ -569,6 +571,6 @@ export class SettingsModal {
         background: var(--color-accent-gold-hover);
       }
     `;
-    this.element.appendChild(style);
+    document.head.appendChild(style);
   }
 }

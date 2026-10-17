@@ -139,7 +139,9 @@ export class FooterControls {
   }
 
   private attachStyles(): void {
+    if (document.getElementById("footer-controls-styles")) return;
     const style = document.createElement("style");
+    style.id = "footer-controls-styles";
     style.textContent = `
       .app-footer-controls {
         position: absolute;
@@ -247,7 +249,7 @@ export class FooterControls {
         box-shadow: 0 0 6px var(--color-accent-emerald);
       }
     `;
-    this.element.appendChild(style);
+    document.head.appendChild(style);
   }
 
   dispose(): void {

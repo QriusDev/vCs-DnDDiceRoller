@@ -183,7 +183,9 @@ export class DiceToolbar {
   }
 
   private attachStyles(): void {
+    if (document.getElementById("dice-toolbar-styles")) return;
     const style = document.createElement("style");
+    style.id = "dice-toolbar-styles";
     style.textContent = `
       .dice-toolbar {
         display: flex;
@@ -325,7 +327,7 @@ export class DiceToolbar {
         border-color: var(--color-accent-crimson);
       }
     `;
-    this.element.appendChild(style);
+    document.head.appendChild(style);
   }
 
   dispose(): void {

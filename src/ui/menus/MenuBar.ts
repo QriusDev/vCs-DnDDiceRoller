@@ -118,7 +118,9 @@ export class MenuBar {
   }
 
   private attachStyles(): void {
+    if (document.getElementById("menu-bar-styles")) return;
     const style = document.createElement("style");
+    style.id = "menu-bar-styles";
     style.textContent = `
       .app-menu-bar {
         display: flex;
@@ -217,6 +219,6 @@ export class MenuBar {
         box-shadow: 0 0 6px var(--color-accent-emerald);
       }
     `;
-    this.element.appendChild(style);
+    document.head.appendChild(style);
   }
 }

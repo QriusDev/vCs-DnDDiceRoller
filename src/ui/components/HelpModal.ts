@@ -81,7 +81,9 @@ export class HelpModal {
   }
 
   private attachStyles(): void {
+    if (document.getElementById("help-modal-styles")) return;
     const style = document.createElement("style");
+    style.id = "help-modal-styles";
     style.textContent = `
       .help-modal-backdrop {
         position: fixed;
@@ -191,6 +193,6 @@ export class HelpModal {
         justify-content: flex-end;
       }
     `;
-    this.element.appendChild(style);
+    document.head.appendChild(style);
   }
 }
