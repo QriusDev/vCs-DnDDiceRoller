@@ -1,29 +1,36 @@
 # [vCs] 3D D&D Dice Roller (Windows Desktop)
 
+![Software Main Screen Example](./docs/Assets/dnddrss1.png)
+
 A high-performance standalone Windows desktop application featuring real-time 3D polyhedral dice rolling with physically accurate rigid-body dynamics, procedural Web Audio API collision sound synthesis, cryptographically fair random number generation, dynamic dice pool management, roll history, and rich visual customization.
 
-Feel free to make pull requests for further improvements or fork for a different direction. Add issues for any bugs.
+Feel free to make pull requests for further improvements or fork for a different direction. Add issues for any bugs. This is completely open source. I don't believe in calling a completely vibe coded project my own, so here ya go. Go crazy!
+Note: Please refer to the docs folder architecture before the final pull request. All acceptable pull requests will be required to update the appropriate `docs/` files and `Readme`.
 
 ---
+![Example Roll Screenshot](./docs/Assets/dnddrss2.png)
 
 ## Highlights & Features
 
 - **Six Mathematically Accurate Polyhedral Dice:** D4 (tetrahedron), D6 (cube), D8 (octahedron), D10 (pentagonal trapezohedron with analytical golden ratio kite proportions), D12 (dodecahedron), and D20 (icosahedron).
 - **Two Distinct Geometry Styles:** Sharp Edge (crisp artisan resin with flat facets) and Rounded / Soft Edge (beveled and chamfered edges for smooth tumbling).
 - **Six PBR Materials & Themes:** Classic Ivory, Obsidian & Gold, Royal Purple Gem, Cyber Neon, Crimson Dragon, and Walnut Wood.
+![Example Roll Screenshot](./docs/Assets/dnddrss4.png)
 - **Custom Body & Numeral Colors:** Color pickers allowing custom resin hues and numeral ink.
+![Example Roll Screenshot](./docs/Assets/dnddrss5.png)
 - **Adjustable 3D Dice Tray:** Three containment presets (Small 11×14, Standard 15×19, Large 20×25) with 5 tray floor materials: Green Velvet, Navy Velvet, Burgundy Velvet, Dark Oak, and Stitched Leather.
 - **Dual Rolling Modes:**
   - **Fair PRNG Target Landing (Default):** Authoritative results determined via unbiased `crypto.getRandomValues` sampling, with target landing solver and physics-guided rotational settling.
   - **Pure Physics Simulation:** Unconstrained chaotic tumbling where the final upward-resting face determines the authoritative result.
 - **Procedural Web Audio API Sound Engine:** Zero external audio file dependencies. Synthesizes material-specific impact thuds (velvet, oak, leather), resonant die-on-die clatter, tray wall knocks, roll toss swooshes, celebratory Natural 20 major-chord fanfares, and ominous Natural 1 low-frequency descending rumbles.
+![Example Roll Screenshot](./docs/Assets/dnddrss6.png)
 - **Dynamic Safeguards:** DynamicsCompressor anti-clipping protection, 16-voice concurrency limiting, velocity thresholds, and 28ms event cooldown preventing audio overload during large multi-dice rolls.
 - **Interactive Controls:** Left-click to add, right-click to remove, mouse raycast pickup and drag-to-toss, right-click/middle-click camera orbiting, and scroll-wheel zoom.
 - **Result HUD & History:** Roll total, structured formulas (e.g. `2d6 [4, 5] + 1d20 [20] = 29`), individual die pills, and a slide-out drawer holding the 20 most recent rolls.
 - **Persistent Preferences:** Schema-versioned LocalStorage with automatic fallback and "Reset to Defaults".
 
 ---
-
+![User Guide Screenshot](./docs/Assets/dnddrss7.png)
 ## Technology Stack
 
 - **Desktop Shell:** Tauri 2.x (Rust Backend, minimal native footprint)
