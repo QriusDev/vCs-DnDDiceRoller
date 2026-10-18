@@ -8,8 +8,11 @@ import {
   RollHistoryEntry,
   RollState,
   AggregateRollResult,
+  RollMode,
+  TraySizePreset,
+  TrayMaterialId,
 } from "@/types";
-import { DEFAULT_SETTINGS } from "@/config/defaultSettings";
+import { DEFAULT_SETTINGS, SETTINGS_SCHEMA_VERSION } from "@/config/defaultSettings";
 import { StorageService } from "./persistence";
 
 export type StateListener<T> = (newValue: T, oldValue: T) => void;
@@ -41,8 +44,39 @@ export class AppState {
 
   constructor(storage: StorageService = new StorageService()) {
     this.storage = storage;
-    this.settings = this.storage.get<AppSettings>("settings", DEFAULT_SETTINGS);
+    this.settings = this.loadValidatedSettings();
     this.history = this.storage.get<RollHistoryEntry[]>("history", []);
+  }
+
+  /**
+   * Safely loads settings from storage with schema validation, migration, and fallback to defaults.
+   */
+  private loadValidatedSettings(): AppSettings {
+    const raw = this.storage.get<Partial<AppSettings>>("settings", DEFAULT_SETTINGS);
+    if (!raw || typeof raw !== "object") {
+      return { ...DEFAULT_SETTINGS };
+    }
+
+    // Schema version check and migration
+    if (!raw.schemaVersion || raw.schemaVersion < SETTINGS_SCHEMA_VERSION) {
+      // Merge with default settings to populate missing fields safely
+      return {
+        ...DEFAULT_SETTINGS,
+        ...raw,
+        schemaVersion: SETTINGS_SCHEMA_VERSION,
+        audio: { ...DEFAULT_SETTINGS.audio, ...raw.audio },
+        physics: { ...DEFAULT_SETTINGS.physics, ...raw.physics },
+        rendering: { ...DEFAULT_SETTINGS.rendering, ...raw.rendering },
+      };
+    }
+
+    return {
+      ...DEFAULT_SETTINGS,
+      ...raw,
+      audio: { ...DEFAULT_SETTINGS.audio, ...raw.audio },
+      physics: { ...DEFAULT_SETTINGS.physics, ...raw.physics },
+      rendering: { ...DEFAULT_SETTINGS.rendering, ...raw.rendering },
+    };
   }
 
   // --- Settings ---
@@ -53,6 +87,13 @@ export class AppState {
   updateSettings(updater: (prev: AppSettings) => AppSettings): void {
     const old = this.settings;
     this.settings = updater(old);
+    this.storage.set("settings", this.settings);
+    this.notify("settings", this.settings, old);
+  }
+
+  resetSettingsToDefaults(): void {
+    const old = this.settings;
+    this.settings = { ...DEFAULT_SETTINGS };
     this.storage.set("settings", this.settings);
     this.notify("settings", this.settings, old);
   }
@@ -75,6 +116,57 @@ export class AppState {
 
   setDiceGeometryStyle(style: DiceGeometryStyle): void {
     this.updateSettings((s) => ({ ...s, diceGeometryStyle: style }));
+  }
+
+  getRollMode(): RollMode {
+    return this.settings.rollMode || "fair-rng";
+  }
+
+  setRollMode(mode: RollMode): void {
+    this.updateSettings((s) => ({ ...s, rollMode: mode }));
+  }
+
+  getTraySize(): TraySizePreset {
+    return this.settings.traySize || "standard";
+  }
+
+  setTraySize(traySize: TraySizePreset): void {
+    this.updateSettings((s) => ({
+      ...s,
+      traySize,
+      physics: { ...s.physics, traySize },
+    }));
+  }
+
+  getTrayMaterial(): TrayMaterialId {
+    return this.settings.trayMaterial || "green-velvet";
+  }
+
+  setTrayMaterial(material: TrayMaterialId): void {
+    this.updateSettings((s) => ({ ...s, trayMaterial: material }));
+  }
+
+  setCustomColors(customBodyColor?: string, customNumberColor?: string): void {
+    this.updateSettings((s) => ({
+      ...s,
+      customBodyColor,
+      customNumberColor,
+    }));
+  }
+
+  setMasterVolume(volume: number): void {
+    const clamped = Math.max(0, Math.min(1, volume));
+    this.updateSettings((s) => ({
+      ...s,
+      audio: { ...s.audio, masterVolume: clamped },
+    }));
+  }
+
+  setMuted(muted: boolean): void {
+    this.updateSettings((s) => ({
+      ...s,
+      audio: { ...s.audio, muted },
+    }));
   }
 
   // --- Dice Pool ---
@@ -120,9 +212,21 @@ export class AppState {
     return true;
   }
 
+  removeDieById(id: string): boolean {
+    const prevPoolState = this.getDicePoolState();
+    const index = this.dicePool.findIndex((d) => d.id === id);
+    if (index === -1) {
+      return false;
+    }
+    this.dicePool.splice(index, 1);
+    this.notify("dicePool", this.getDicePoolState(), prevPoolState);
+    return true;
+  }
+
   clearDicePool(): void {
     const prevPoolState = this.getDicePoolState();
     this.dicePool = [];
+    this.setRollState("idle");
     this.notify("dicePool", this.getDicePoolState(), prevPoolState);
   }
 
@@ -162,7 +266,7 @@ export class AppState {
     return this.subscribe("rollState", listener);
   }
 
-  // --- Last Roll & History ---
+  // --- Last Roll & History (capped at 20 entries) ---
   getLastRoll(): AggregateRollResult | null {
     return this.lastRoll;
   }
@@ -172,11 +276,11 @@ export class AppState {
     this.lastRoll = result;
     this.notify("lastRoll", result, old);
 
-    // Also push to history
+    // Push to history (strictly cap at 20 rolls)
     const oldHistory = [...this.history];
     this.history.unshift(result);
-    if (this.history.length > 50) {
-      this.history.pop();
+    if (this.history.length > 20) {
+      this.history.length = 20;
     }
     this.storage.set("history", this.history);
     this.notify("history", this.history, oldHistory);

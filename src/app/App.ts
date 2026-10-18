@@ -1,5 +1,6 @@
 import { AppState } from "@/core/state/AppState";
 import { SceneManager } from "@/rendering/scene/SceneManager";
+import { AudioManager } from "@/audio/AudioManager";
 import { MenuBar } from "@/ui/menus/MenuBar";
 import { DiceToolbar } from "@/ui/components/DiceToolbar";
 import { ResultHud } from "@/ui/components/ResultHud";
@@ -7,11 +8,13 @@ import { FooterControls } from "@/ui/components/FooterControls";
 import { SettingsModal } from "@/ui/settings/SettingsModal";
 import { HistoryDrawer } from "@/ui/components/HistoryDrawer";
 import { HelpModal } from "@/ui/components/HelpModal";
+import type { AggregateRollResult } from "@/types";
 
 export class App {
   private readonly root: HTMLElement;
   private appState: AppState | null = null;
   private sceneManager: SceneManager | null = null;
+  private audioManager: AudioManager | null = null;
   private menuBar: MenuBar | null = null;
   private diceToolbar: DiceToolbar | null = null;
   private resultHud: ResultHud | null = null;
@@ -31,11 +34,22 @@ export class App {
 
       // 1. Initialize State
       this.appState = new AppState();
+      const initialSettings = this.appState.getSettings();
 
-      // 2. Build DOM shell
+      // 2. Initialize Audio Manager
+      this.audioManager = new AudioManager(initialSettings.audio, initialSettings.trayMaterial);
+
+      // 3. Build DOM shell
       this.menuBar = new MenuBar({
         onOpenSettings: () => this.settingsModal?.open(),
         onOpenHelp: () => this.helpModal?.open(),
+        onResetCamera: () => this.sceneManager?.resetCamera(),
+        onToggleHistory: () => {
+          if (this.historyDrawer) {
+            this.historyDrawer.open();
+          }
+        },
+        onClearTray: () => this.appState?.clearDicePool(),
       });
       this.root.appendChild(this.menuBar.element);
 
@@ -69,26 +83,112 @@ export class App {
 
       this.footerControls = new FooterControls(this.appState, {
         onOpenHistory: () => this.historyDrawer?.open(),
+        onRollRequest: () => {
+          this.triggerRoll();
+        },
       });
       this.root.appendChild(this.footerControls.element);
 
-      // 3. Initialize Three.js 3D Scene
-      this.sceneManager = new SceneManager(this.viewportEl, this.appState.getSettings());
+      // 4. Initialize Three.js 3D Scene
+      this.sceneManager = new SceneManager(this.viewportEl, initialSettings);
 
-      // 4. React to Theme and Style updates in real-time
+      // 5. Connect Physics Collision Events to Web Audio Synthesis
+      this.sceneManager.getPhysicsWorld().onCollision((event) => {
+        this.audioManager?.handleCollision(event);
+      });
+
+      // 6. Connect Dice Pool with 3D Scene
+      this.appState.onDicePoolChange((pool) => {
+        this.sceneManager?.syncDicePool(pool);
+      });
+
+      // Populate initial dice if pool already had persisted dice, or initialize default
+      const initialPool = this.appState.getDicePoolState();
+      if (initialPool.dice.length === 0) {
+        // Add 1xd20 by default
+        this.appState.addDieToPool("d20");
+      } else {
+        this.sceneManager.syncDicePool(initialPool);
+      }
+
+      // 7. Connect Physics Simulation Events to AppState & Critical Audio
+      const simManager = this.sceneManager.getSimulationManager();
+      simManager.onRollEvent((eventName, data) => {
+        if (eventName === "rollStarted") {
+          this.appState?.setRollState("rolling");
+        } else if (eventName === "rollCompleted" || eventName === "rollRecovered") {
+          const aggregate = data as AggregateRollResult;
+          this.appState?.setLastRoll(aggregate);
+          this.appState?.setRollState(eventName === "rollRecovered" ? "recovered" : "completed");
+
+          // Play Critical Hit / Miss Audio (evaluated per individual d20)
+          const d20Dice = aggregate.dice.filter((d) => d.type === "d20");
+          const hasNat20 = d20Dice.some((d) => d.value === 20 || d.isCriticalHit);
+          const hasNat1 = d20Dice.some((d) => d.value === 1 || d.isCriticalMiss);
+
+          // If both occur in multi-d20 roll, prioritize triumphant fanfare
+          if (hasNat20) {
+            this.audioManager?.playCriticalHitFanfare();
+          } else if (hasNat1) {
+            this.audioManager?.playCriticalMissRumble();
+          }
+        }
+      });
+
+      // 8. React to Theme, Style, Tray Size, Tray Material & Audio updates in real-time
       this.appState.onSettingsChange((newSettings, oldSettings) => {
         if (!this.sceneManager) return;
         if (newSettings.diceGeometryStyle !== oldSettings.diceGeometryStyle) {
           this.sceneManager.updateGeometryStyle(newSettings.diceGeometryStyle);
         }
-        if (newSettings.diceTheme !== oldSettings.diceTheme) {
-          this.sceneManager.updateTheme(newSettings.diceTheme);
+        if (
+          newSettings.diceTheme !== oldSettings.diceTheme ||
+          newSettings.customBodyColor !== oldSettings.customBodyColor ||
+          newSettings.customNumberColor !== oldSettings.customNumberColor
+        ) {
+          this.sceneManager.updateTheme(
+            newSettings.diceTheme,
+            newSettings.customBodyColor,
+            newSettings.customNumberColor
+          );
+        }
+        if (newSettings.traySize !== oldSettings.traySize) {
+          this.sceneManager.updateTraySize(newSettings.traySize);
+        }
+        if (newSettings.trayMaterial !== oldSettings.trayMaterial) {
+          this.sceneManager.updateTrayMaterial(newSettings.trayMaterial);
+          this.audioManager?.setTrayMaterial(newSettings.trayMaterial);
+        }
+        if (newSettings.physics !== oldSettings.physics) {
+          this.sceneManager.getPhysicsWorld().updatePhysicsConfig(newSettings.physics);
+        }
+        if (newSettings.audio !== oldSettings.audio) {
+          this.audioManager?.setPreferences(newSettings.audio);
         }
       });
     } catch (err) {
       console.error("Critical failure during App initialization:", err);
       this.renderErrorFallback(err instanceof Error ? err.message : String(err));
     }
+  }
+
+  triggerRoll(): void {
+    if (!this.sceneManager || !this.appState) return;
+
+    let pool = this.appState.getDicePoolState();
+    if (pool.dice.length === 0) {
+      this.appState.addDieToPool("d20");
+      pool = this.appState.getDicePoolState();
+    }
+
+    const mode = this.appState.getRollMode();
+    this.appState.setRollState("preparing");
+
+    // Play throw initiation sound
+    this.audioManager?.playRollStartSound();
+
+    // Initiate 3D rigid body toss
+    this.sceneManager.rollAllDice(mode);
   }
 
   private renderErrorFallback(errorMessage: string): void {
@@ -107,6 +207,10 @@ export class App {
   }
 
   dispose(): void {
+    if (this.audioManager) {
+      this.audioManager.dispose();
+      this.audioManager = null;
+    }
     if (this.sceneManager) {
       this.sceneManager.dispose();
       this.sceneManager = null;
@@ -122,6 +226,15 @@ export class App {
     if (this.footerControls) {
       this.footerControls.dispose();
       this.footerControls = null;
+    }
+    if (this.settingsModal) {
+      this.settingsModal.close();
+    }
+    if (this.historyDrawer) {
+      this.historyDrawer.close();
+    }
+    if (this.helpModal) {
+      this.helpModal.close();
     }
   }
 }

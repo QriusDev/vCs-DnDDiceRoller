@@ -5,9 +5,30 @@ import type { DieRollResult } from "@/types";
 describe("ResultCalculator", () => {
   it("should calculate aggregate total correctly", () => {
     const dice: DieRollResult[] = [
-      { dieId: "1", type: "d20", value: 18, isCriticalHit: false, isCriticalMiss: false },
-      { dieId: "2", type: "d6", value: 5, isCriticalHit: false, isCriticalMiss: false },
-      { dieId: "3", type: "d4", value: 3, isCriticalHit: false, isCriticalMiss: false },
+      {
+        dieId: "1",
+        type: "d20",
+        value: 18,
+        rawFaceValue: 18,
+        isCriticalHit: false,
+        isCriticalMiss: false,
+      },
+      {
+        dieId: "2",
+        type: "d6",
+        value: 5,
+        rawFaceValue: 5,
+        isCriticalHit: false,
+        isCriticalMiss: false,
+      },
+      {
+        dieId: "3",
+        type: "d4",
+        value: 3,
+        rawFaceValue: 3,
+        isCriticalHit: false,
+        isCriticalMiss: false,
+      },
     ];
 
     const result = ResultCalculator.createAggregateResult(dice);

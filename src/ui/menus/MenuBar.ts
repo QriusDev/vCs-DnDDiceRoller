@@ -1,6 +1,9 @@
 export interface MenuBarCallbacks {
   onOpenSettings: () => void;
   onOpenHelp: () => void;
+  onResetCamera: () => void;
+  onToggleHistory: () => void;
+  onClearTray: () => void;
 }
 
 export class MenuBar {
@@ -14,34 +17,44 @@ export class MenuBar {
       <div class="menu-brand">
         <span class="brand-icon">🎲</span>
         <span class="brand-title">D&D 3D Dice Roller</span>
-        <span class="badge badge-placeholder">v0.1.0 • Phase 1</span>
+        <span class="badge badge-placeholder">v1.0.0</span>
       </div>
       <nav class="menu-nav">
+        <!-- File Menu -->
         <div class="menu-item" data-menu="file">
-          <button class="menu-button" type="button">File</button>
+          <button class="menu-button" type="button" aria-haspopup="true" aria-expanded="false">File</button>
           <div class="menu-dropdown" hidden>
-            <button class="menu-dropdown-item" type="button" data-action="new-tray">New Tray</button>
-            <button class="menu-dropdown-item" type="button" data-action="save-preset" disabled>Save Dice Preset <span class="badge badge-placeholder">Phase 2</span></button>
+            <button class="menu-dropdown-item" type="button" data-action="clear-tray">Clear Tray</button>
             <div class="menu-divider"></div>
             <button class="menu-dropdown-item" type="button" data-action="exit">Exit</button>
           </div>
         </div>
 
+        <!-- View Menu -->
         <div class="menu-item" data-menu="view">
-          <button class="menu-button" type="button">View</button>
+          <button class="menu-button" type="button" aria-haspopup="true" aria-expanded="false">View</button>
           <div class="menu-dropdown" hidden>
             <button class="menu-dropdown-item" type="button" data-action="reset-camera">Reset Camera View</button>
-            <button class="menu-dropdown-item" type="button" data-action="toggle-shadows" disabled>Toggle Soft Shadows <span class="badge badge-placeholder">Phase 2</span></button>
+            <button class="menu-dropdown-item" type="button" data-action="toggle-history">Toggle Roll History</button>
+            <div class="menu-divider"></div>
             <button class="menu-dropdown-item" type="button" data-action="fullscreen">Toggle Fullscreen</button>
           </div>
         </div>
 
+        <!-- Settings Menu -->
         <div class="menu-item" data-menu="settings">
-          <button class="menu-button" type="button" data-action="open-settings">Settings...</button>
+          <button class="menu-button" type="button" aria-haspopup="true" aria-expanded="false">Settings</button>
+          <div class="menu-dropdown" hidden>
+            <button class="menu-dropdown-item" type="button" data-action="open-settings">Preferences...</button>
+          </div>
         </div>
 
+        <!-- Help Menu -->
         <div class="menu-item" data-menu="help">
-          <button class="menu-button" type="button" data-action="open-help">Help</button>
+          <button class="menu-button" type="button" aria-haspopup="true" aria-expanded="false">Help</button>
+          <div class="menu-dropdown" hidden>
+            <button class="menu-dropdown-item" type="button" data-action="open-help">User Guide & About</button>
+          </div>
         </div>
       </nav>
       <div class="menu-meta">
@@ -61,6 +74,24 @@ export class MenuBar {
       if (!button) return;
 
       const action = button.dataset.action;
+      if (action === "clear-tray") {
+        callbacks.onClearTray();
+        this.closeAllDropdowns();
+        return;
+      }
+
+      if (action === "reset-camera") {
+        callbacks.onResetCamera();
+        this.closeAllDropdowns();
+        return;
+      }
+
+      if (action === "toggle-history") {
+        callbacks.onToggleHistory();
+        this.closeAllDropdowns();
+        return;
+      }
+
       if (action === "open-settings") {
         callbacks.onOpenSettings();
         this.closeAllDropdowns();
@@ -96,6 +127,7 @@ export class MenuBar {
           const isOpen = !dropdown.hidden;
           this.closeAllDropdowns();
           dropdown.hidden = isOpen;
+          button.setAttribute("aria-expanded", String(!isOpen));
           if (!isOpen) {
             this.activeDropdown = dropdown;
           }
@@ -114,6 +146,8 @@ export class MenuBar {
   private closeAllDropdowns(): void {
     const dropdowns = this.element.querySelectorAll<HTMLElement>(".menu-dropdown");
     dropdowns.forEach((d) => (d.hidden = true));
+    const buttons = this.element.querySelectorAll<HTMLButtonElement>(".menu-button");
+    buttons.forEach((b) => b.setAttribute("aria-expanded", "false"));
     this.activeDropdown = null;
   }
 

@@ -7,7 +7,17 @@ import { PhysicsWorld } from "@/core/physics/PhysicsWorld";
 import { DiceMaterialManager } from "../materials/DiceMaterialManager";
 import { DieMesh } from "../geometries/DieMesh";
 import { DiceFactory } from "@/core/dice/DiceFactory";
-import type { AppSettings, DiceGeometryStyle, DiceThemeId, DiceType } from "@/types";
+import { DiceSimulationManager } from "@/core/physics/DiceSimulationManager";
+import { DiceInteractionController } from "../interaction/DiceInteractionController";
+import type {
+  AppSettings,
+  DiceGeometryStyle,
+  DicePoolState,
+  DiceThemeId,
+  RollMode,
+  TrayMaterialId,
+  TraySizePreset,
+} from "@/types";
 
 export class SceneManager {
   private readonly container: HTMLElement;
@@ -19,26 +29,30 @@ export class SceneManager {
   private readonly diceMaterialManager: DiceMaterialManager;
   private readonly trayMesh: TrayMesh;
   private readonly physicsWorld: PhysicsWorld;
+  private readonly simManager: DiceSimulationManager;
+  private readonly interactionController: DiceInteractionController;
 
-  // The 6 showcase polyhedral dice (D4, D6, D8, D10, D12, D20)
-  private readonly showcaseDiceGroup: THREE.Group;
-  private readonly showcaseDice: Map<DiceType, DieMesh> = new Map();
+  // Active pool dice meshes in the tray
+  private readonly activeDiceGroup: THREE.Group;
+  private readonly activeDiceMeshes: Map<string, DieMesh> = new Map();
 
   private animationFrameId: number | null = null;
   private resizeObserver: ResizeObserver | null = null;
   private readonly clock: THREE.Clock;
   private isDisposed = false;
 
-  // Interactive inspection rotation state
-  private isPointerDown = false;
-  private previousPointerX = 0;
-  private previousPointerY = 0;
-  private selectedDie: DieMesh | null = null;
-  private autoRotate = true;
+  private currentGeometryStyle: DiceGeometryStyle;
+  private currentTheme: DiceThemeId;
+  private customBodyColor?: string;
+  private customNumberColor?: string;
 
   constructor(container: HTMLElement, settings: AppSettings) {
     this.container = container;
     this.clock = new THREE.Clock();
+    this.currentGeometryStyle = settings.diceGeometryStyle || "sharp";
+    this.currentTheme = settings.diceTheme || "obsidian-gold";
+    this.customBodyColor = settings.customBodyColor;
+    this.customNumberColor = settings.customNumberColor;
 
     const width = container.clientWidth || 800;
     const height = container.clientHeight || 600;
@@ -66,145 +80,130 @@ export class SceneManager {
 
     this.container.appendChild(this.renderer.domElement);
 
-    // 4. Material Factory & Lighting
+    // 4. Materials & Lighting
     this.materialFactory = new MaterialFactory();
     this.diceMaterialManager = new DiceMaterialManager();
     this.lightingRig = new LightingRig();
     this.scene.add(this.lightingRig.group);
 
-    // 5. Tray Mesh
-    this.trayMesh = new TrayMesh(this.materialFactory);
-    this.scene.add(this.trayMesh.group);
-
-    // 6. Physics World
+    // 5. Physics World
     this.physicsWorld = new PhysicsWorld(settings.physics);
 
-    // 7. Showcase all six mathematically correct 3D dice
-    this.showcaseDiceGroup = new THREE.Group();
-    this.showcaseDiceGroup.name = "ShowcaseDiceGroup";
-    this.setupShowcaseDice(
-      settings.diceGeometryStyle || "sharp",
-      settings.diceTheme || "obsidian-gold"
+    // 6. Tray Mesh
+    this.trayMesh = new TrayMesh(
+      this.materialFactory,
+      this.physicsWorld.getTrayDimensions(),
+      settings.trayMaterial || "green-velvet"
     );
-    this.scene.add(this.showcaseDiceGroup);
+    this.scene.add(this.trayMesh.group);
 
-    // 8. Resize & Pointer Interaction handling
+    // 7. Simulation Manager
+    this.simManager = new DiceSimulationManager(this.physicsWorld);
+
+    // 8. Active dice container group
+    this.activeDiceGroup = new THREE.Group();
+    this.activeDiceGroup.name = "ActiveDiceGroup";
+    this.scene.add(this.activeDiceGroup);
+
+    // 9. Pointer Interaction Controller (Drag, Toss & Orbit)
+    this.interactionController = new DiceInteractionController(
+      this.renderer.domElement,
+      this.cameraRig,
+      this.simManager,
+      this.activeDiceGroup
+    );
+
+    // 10. Resize handling & render loop
     this.setupResizeObserver();
-    this.setupPointerInteractions();
-
-    // 9. Start render loop
     this.startLoop();
   }
 
-  private setupShowcaseDice(style: DiceGeometryStyle, theme: DiceThemeId): void {
-    const diceTypes: DiceType[] = ["d4", "d6", "d8", "d10", "d12", "d20"];
-    const positions: [number, number, number][] = [
-      [-5.0, 1.1, 0],
-      [-3.0, 1.1, 0],
-      [-1.0, 1.1, 0],
-      [1.0, 1.1, 0],
-      [3.0, 1.1, 0],
-      [5.0, 1.1, 0],
-    ];
+  getSimulationManager(): DiceSimulationManager {
+    return this.simManager;
+  }
 
-    diceTypes.forEach((type, idx) => {
-      const dieMesh = DiceFactory.createVisualDie(
-        {
-          type,
-          geometryStyle: style,
-          theme,
-        },
-        this.diceMaterialManager
-      );
+  getPhysicsWorld(): PhysicsWorld {
+    return this.physicsWorld;
+  }
 
-      const [x, y, z] = positions[idx];
-      dieMesh.position.set(x, y, z);
-      this.showcaseDiceGroup.add(dieMesh);
-      this.showcaseDice.set(type, dieMesh);
+  resetCamera(): void {
+    this.cameraRig.resetPosition();
+  }
+
+  /**
+   * Synchronizes active dice meshes with AppState dice pool.
+   */
+  syncDicePool(pool: DicePoolState): void {
+    const currentIds = new Set(pool.dice.map((d) => d.id));
+
+    // 1. Remove dice no longer in pool
+    for (const [id, mesh] of this.activeDiceMeshes.entries()) {
+      if (!currentIds.has(id)) {
+        this.simManager.removeDie(id);
+        this.activeDiceGroup.remove(mesh);
+        mesh.dispose();
+        this.activeDiceMeshes.delete(id);
+      }
+    }
+
+    // 2. Add new dice into the tray
+    pool.dice.forEach((dieInstance, idx) => {
+      if (!this.activeDiceMeshes.has(dieInstance.id)) {
+        const mesh = DiceFactory.createVisualDie(
+          {
+            type: dieInstance.type,
+            geometryStyle: this.currentGeometryStyle,
+            theme: this.currentTheme,
+            customBodyColor: this.customBodyColor,
+            customNumberColor: this.customNumberColor,
+          },
+          this.diceMaterialManager
+        );
+
+        // Calculate a neat initial placement grid in the tray
+        const row = Math.floor(idx / 4);
+        const col = idx % 4;
+        const x = (col - 1.5) * 2.5;
+        const z = (row - 1) * 2.5;
+        mesh.position.set(x, 1.2, z);
+
+        this.activeDiceGroup.add(mesh);
+        this.activeDiceMeshes.set(dieInstance.id, mesh);
+
+        // Add to physics simulation
+        this.simManager.addDie(dieInstance.id, dieInstance.type, mesh);
+      }
     });
   }
 
+  rollAllDice(mode: RollMode): void {
+    this.simManager.rollAll(mode);
+  }
+
+  updateTraySize(preset: TraySizePreset): void {
+    this.physicsWorld.setTrayPreset(preset);
+    const newDims = this.physicsWorld.getTrayDimensions();
+    this.trayMesh.rebuild(newDims);
+  }
+
+  updateTrayMaterial(materialId: TrayMaterialId): void {
+    this.trayMesh.setMaterial(materialId);
+  }
+
   updateGeometryStyle(style: DiceGeometryStyle): void {
-    for (const die of this.showcaseDice.values()) {
+    this.currentGeometryStyle = style;
+    for (const die of this.activeDiceMeshes.values()) {
       die.setGeometryStyle(style);
     }
   }
 
   updateTheme(themeId: DiceThemeId, customBodyColor?: string, customNumberColor?: string): void {
-    for (const die of this.showcaseDice.values()) {
+    this.currentTheme = themeId;
+    this.customBodyColor = customBodyColor;
+    this.customNumberColor = customNumberColor;
+    for (const die of this.activeDiceMeshes.values()) {
       die.setTheme(themeId, customBodyColor, customNumberColor);
     }
-  }
-
-  getShowcaseDie(type: DiceType): DieMesh | undefined {
-    return this.showcaseDice.get(type);
-  }
-
-  private setupPointerInteractions(): void {
-    const dom = this.renderer.domElement;
-    const raycaster = new THREE.Raycaster();
-    const mouse = new THREE.Vector2();
-
-    const onPointerDown = (e: MouseEvent): void => {
-      this.isPointerDown = true;
-      this.previousPointerX = e.clientX;
-      this.previousPointerY = e.clientY;
-
-      const rect = dom.getBoundingClientRect();
-      mouse.x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
-      mouse.y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
-
-      raycaster.setFromCamera(mouse, this.cameraRig.camera);
-      const intersects = raycaster.intersectObjects(this.showcaseDiceGroup.children, true);
-
-      if (intersects.length > 0) {
-        // Find top DieMesh parent
-        let obj: THREE.Object3D | null = intersects[0].object;
-        while (obj && !(obj instanceof DieMesh)) {
-          obj = obj.parent;
-        }
-        if (obj instanceof DieMesh) {
-          this.selectedDie = obj;
-          this.autoRotate = false;
-        }
-      } else {
-        this.selectedDie = null;
-      }
-    };
-
-    const onPointerMove = (e: MouseEvent): void => {
-      if (!this.isPointerDown) return;
-      const deltaX = e.clientX - this.previousPointerX;
-      const deltaY = e.clientY - this.previousPointerY;
-      this.previousPointerX = e.clientX;
-      this.previousPointerY = e.clientY;
-
-      if (this.selectedDie) {
-        // Rotate the selected die
-        this.selectedDie.rotation.y += deltaX * 0.02;
-        this.selectedDie.rotation.x += deltaY * 0.02;
-      } else {
-        // Rotate all showcase dice
-        for (const die of this.showcaseDice.values()) {
-          die.rotation.y += deltaX * 0.015;
-          die.rotation.x += deltaY * 0.015;
-        }
-      }
-    };
-
-    const onPointerUp = (): void => {
-      this.isPointerDown = false;
-      // Resume auto tumble after 1.5 seconds if released
-      window.setTimeout(() => {
-        if (!this.isPointerDown) {
-          this.autoRotate = true;
-        }
-      }, 1500);
-    };
-
-    dom.addEventListener("mousedown", onPointerDown);
-    window.addEventListener("mousemove", onPointerMove);
-    window.addEventListener("mouseup", onPointerUp);
   }
 
   private setupResizeObserver(): void {
@@ -229,31 +228,12 @@ export class SceneManager {
       this.animationFrameId = requestAnimationFrame(animate);
 
       const delta = Math.min(this.clock.getDelta(), 0.1);
+
+      // Step physics world with fixed timestep & substepping
       this.physicsWorld.step(delta);
 
-      const elapsed = this.clock.getElapsedTime();
-
-      // Gentle showcase tumble of all 6 dice to display faces, numbers, and specular highlights
-      if (this.autoRotate) {
-        const rotations = [
-          { speedX: 0.45, speedY: 0.65, speedZ: 0.2 }, // D4
-          { speedX: 0.55, speedY: 0.35, speedZ: 0.4 }, // D6
-          { speedX: 0.35, speedY: 0.75, speedZ: 0.25 }, // D8
-          { speedX: 0.6, speedY: 0.4, speedZ: 0.35 }, // D10
-          { speedX: 0.3, speedY: 0.55, speedZ: 0.45 }, // D12
-          { speedX: 0.5, speedY: 0.7, speedZ: 0.3 }, // D20
-        ];
-
-        let idx = 0;
-        for (const die of this.showcaseDice.values()) {
-          const r = rotations[idx % rotations.length];
-          die.rotation.x = elapsed * r.speedX;
-          die.rotation.y = elapsed * r.speedY;
-          die.rotation.z = elapsed * r.speedZ;
-          die.position.y = 1.1 + Math.sin(elapsed * 2.2 + idx * 0.8) * 0.12;
-          idx++;
-        }
-      }
+      // Update simulation transforms & settlement checks
+      this.simManager.update(delta);
 
       this.renderer.render(this.scene, this.cameraRig.camera);
     };
@@ -275,20 +255,20 @@ export class SceneManager {
       this.resizeObserver = null;
     }
 
-    // Dispose showcase dice
-    for (const die of this.showcaseDice.values()) {
+    this.interactionController.dispose();
+    this.simManager.clear();
+
+    for (const die of this.activeDiceMeshes.values()) {
       die.dispose();
     }
-    this.showcaseDice.clear();
+    this.activeDiceMeshes.clear();
 
-    // Dispose tray, lighting, materials, physics
     this.trayMesh.dispose();
     this.lightingRig.dispose();
     this.materialFactory.dispose();
     this.diceMaterialManager.dispose();
     this.physicsWorld.destroy();
 
-    // Dispose renderer
     this.renderer.dispose();
     if (this.renderer.domElement.parentElement) {
       this.renderer.domElement.parentElement.removeChild(this.renderer.domElement);

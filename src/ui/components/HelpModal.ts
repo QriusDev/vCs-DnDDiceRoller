@@ -14,11 +14,11 @@ export class HelpModal {
 
   private render(): void {
     this.element.innerHTML = `
-      <div class="help-modal-dialog glass-panel" role="dialog" aria-modal="true">
+      <div class="help-modal-dialog glass-panel" role="dialog" aria-modal="true" aria-labelledby="helpModalTitle">
         <div class="help-header">
           <div class="help-title-group">
             <span class="help-icon">📖</span>
-            <h2 class="help-title">D&D 3D Dice Roller Guide</h2>
+            <h2 id="helpModalTitle" class="help-title">User Guide & About</h2>
           </div>
           <button class="help-close-btn" type="button" aria-label="Close help">&times;</button>
         </div>
@@ -29,17 +29,34 @@ export class HelpModal {
             <ul class="help-list">
               <li><strong>Left-Click Toolbar Die:</strong> Add one die to the active tray pool.</li>
               <li><strong>Right-Click Toolbar Die:</strong> Remove one die from the tray pool.</li>
+              <li><strong>Left-Click & Drag (in Tray):</strong> Pick up and toss an individual die.</li>
+              <li><strong>Right-Click & Drag:</strong> Orbit and rotate the 3D camera around the tray.</li>
+              <li><strong>Middle-Click & Drag:</strong> Pan camera view.</li>
+              <li><strong>Scroll Wheel:</strong> Zoom in and out of the tray.</li>
               <li><strong>Spacebar:</strong> Roll all dice currently in the tray.</li>
-              <li><strong>Escape:</strong> Close any open modal dialog or drawer.</li>
+              <li><strong>Escape:</strong> Close open modal dialog or history drawer.</li>
               <li><strong>F11:</strong> Toggle Fullscreen viewport mode.</li>
             </ul>
           </section>
 
           <section class="help-section">
-            <h3 class="help-section-title">Technical Architecture</h3>
+            <h3 class="help-section-title">Rolling Modes</h3>
             <p class="help-text">
-              Built on <strong>Tauri 2.x (Rust Shell)</strong>, <strong>Three.js (WebGL 3D Engine)</strong>,
-              <strong>Cannon-es (Physics Simulation)</strong>, and <strong>TypeScript</strong>.
+              <strong>Fair PRNG Target Landing (Default):</strong> authoritative rolls sampled via cryptographically secure
+              <code>crypto.getRandomValues</code>, then simulated through natural tumbling dynamics to settle on the chosen face.
+            </p>
+            <p class="help-text" style="margin-top: 6px;">
+              <strong>Pure Physics Simulation:</strong> free, chaotic rigid-body dynamics where the resting face after collision determines the final score.
+            </p>
+          </section>
+
+          <section class="help-section">
+            <h3 class="help-section-title">About D&D 3D Dice Roller</h3>
+            <p class="help-text">
+              <strong>Version:</strong> 1.0.0 (Release Edition)<br/>
+              <strong>Engine:</strong> Three.js (WebGL PBR) + Cannon-es (Rigid-body dynamics)<br/>
+              <strong>Desktop Shell:</strong> Tauri 2.x (Rust Backend) + TypeScript Frontend<br/>
+              <strong>Audio Engine:</strong> Real-time Procedural Web Audio API Synthesis
             </p>
           </section>
         </div>

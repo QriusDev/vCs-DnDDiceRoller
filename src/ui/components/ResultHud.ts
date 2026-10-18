@@ -1,5 +1,5 @@
 import type { AppState } from "@/core/state/AppState";
-import type { AggregateRollResult, DicePoolState, RollState } from "@/types";
+import type { DicePoolState } from "@/types";
 
 export class ResultHud {
   readonly element: HTMLElement;
@@ -22,8 +22,13 @@ export class ResultHud {
     const lastRoll = this.appState.getLastRoll();
 
     const poolSummary = this.formatPoolSummary(pool);
-    const hasCritHit = lastRoll?.dice.some((d) => d.isCriticalHit) ?? false;
-    const hasCritMiss = lastRoll?.dice.some((d) => d.isCriticalMiss) ?? false;
+    const isRolling =
+      rollState === "rolling" || rollState === "preparing" || rollState === "settling";
+
+    // Detect critical conditions on d20 dice
+    const d20Dice = lastRoll?.dice.filter((d) => d.type === "d20") ?? [];
+    const hasCritHit = d20Dice.some((d) => d.value === 20 || d.isCriticalHit);
+    const hasCritMiss = d20Dice.some((d) => d.value === 1 || d.isCriticalMiss);
 
     this.element.innerHTML = `
       <div class="hud-header">
@@ -38,22 +43,50 @@ export class ResultHud {
 
       <div class="hud-body">
         <div class="hud-total-container">
-          <span class="hud-total-caption">TOTAL RESULT</span>
-          <div class="hud-total-number ${hasCritHit ? "crit-hit" : ""} ${hasCritMiss ? "crit-miss" : ""}">
-            ${lastRoll !== null ? lastRoll.total : "—"}
-          </div>
+          <span class="hud-total-caption">${isRolling ? "SIMULATING TOSS" : "TOTAL RESULT"}</span>
+          
           ${
-            hasCritHit
-              ? `<div class="crit-banner crit-hit-banner">✨ NATURAL 20! CRITICAL HIT!</div>`
-              : hasCritMiss
-                ? `<div class="crit-banner crit-miss-banner">💀 NATURAL 1! CRITICAL MISS!</div>`
-                : ""
+            isRolling
+              ? `
+                <div class="hud-rolling-view">
+                  <div class="hud-tumbling-die" aria-hidden="true">
+                    <div class="cube-spinner"></div>
+                  </div>
+                  <span class="hud-rolling-text">Rolling...</span>
+                </div>
+              `
+              : `
+                <div class="hud-total-number ${hasCritHit ? "crit-hit" : ""} ${hasCritMiss ? "crit-miss" : ""}">
+                  ${lastRoll !== null ? lastRoll.total : "—"}
+                </div>
+              `
+          }
+
+          ${
+            !isRolling && hasCritHit
+              ? `<div class="crit-banner crit-hit-banner" role="status">
+                  <span class="crit-sparkle">✨</span>
+                  <span>NATURAL 20! CRITICAL HIT!</span>
+                  <span class="crit-sparkle">✨</span>
+                </div>`
+              : ""
+          }
+          ${
+            !isRolling && hasCritMiss
+              ? `<div class="crit-banner crit-miss-banner" role="status">
+                  <span class="crit-skull">💀</span>
+                  <span>NATURAL 1! CRITICAL MISS!</span>
+                </div>`
+              : ""
           }
         </div>
 
         ${
-          lastRoll && lastRoll.dice.length > 0
+          !isRolling && lastRoll && lastRoll.dice.length > 0
             ? `
+              <div class="hud-formula-row">
+                <span class="hud-formula-text">${lastRoll.formula || ""}</span>
+              </div>
               <div class="hud-breakdown">
                 <span class="hud-breakdown-caption">DICE BREAKDOWN:</span>
                 <div class="hud-dice-pills">
@@ -70,11 +103,17 @@ export class ResultHud {
                 </div>
               </div>
             `
-            : `
-              <div class="hud-placeholder-hint">
-                Add dice from the toolbar and press Roll (Space)
-              </div>
-            `
+            : isRolling
+              ? `
+                <div class="hud-placeholder-hint rolling-hint">
+                  Dice are tumbling in the tray...
+                </div>
+              `
+              : `
+                <div class="hud-placeholder-hint">
+                  Select dice from toolbar and press Roll (Space)
+                </div>
+              `
         }
       </div>
     `;
@@ -93,15 +132,10 @@ export class ResultHud {
   private setupSubscriptions(): void {
     this.unsubs.push(
       this.appState.onDicePoolChange(() => this.render()),
-      this.appState.onRollStateChange((newState: RollState) => {
-        const indicator = this.element.querySelector(".hud-status-indicator");
-        const label = this.element.querySelector(".hud-status-label");
-        if (indicator && label) {
-          indicator.className = `hud-status-indicator status-${newState}`;
-          label.textContent = newState.toUpperCase();
-        }
+      this.appState.onRollStateChange(() => {
+        this.render();
       }),
-      this.appState.onLastRollChange((_roll: AggregateRollResult | null) => this.render())
+      this.appState.onLastRollChange(() => this.render())
     );
   }
 
@@ -115,7 +149,7 @@ export class ResultHud {
         top: 96px;
         left: 20px;
         min-width: 260px;
-        max-width: 340px;
+        max-width: 360px;
         padding: var(--space-4);
         z-index: 30;
         pointer-events: auto;
@@ -143,13 +177,23 @@ export class ResultHud {
         background-color: var(--color-accent-emerald);
         box-shadow: 0 0 6px var(--color-accent-emerald);
       }
+      .hud-status-indicator.status-preparing {
+        background-color: var(--color-accent-gold);
+      }
       .hud-status-indicator.status-rolling {
         background-color: var(--color-accent-gold);
         box-shadow: 0 0 8px var(--color-accent-gold);
-        animation: pulse 1s infinite alternate;
+        animation: pulse 0.8s infinite alternate;
       }
-      .hud-status-indicator.status-settled {
-        background-color: var(--color-accent-blue);
+      .hud-status-indicator.status-settling {
+        background-color: #38bdf8;
+        box-shadow: 0 0 6px #38bdf8;
+      }
+      .hud-status-indicator.status-completed {
+        background-color: var(--color-accent-emerald);
+      }
+      .hud-status-indicator.status-recovered {
+        background-color: #f59e0b;
       }
       @keyframes pulse {
         0% { opacity: 0.4; }
@@ -198,23 +242,85 @@ export class ResultHud {
         color: #f43f5e;
         text-shadow: 0 0 16px rgba(244, 63, 94, 0.8);
       }
+      .hud-rolling-view {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        margin: 8px 0;
+      }
+      .hud-tumbling-die {
+        width: 24px;
+        height: 24px;
+        perspective: 100px;
+      }
+      .cube-spinner {
+        width: 100%;
+        height: 100%;
+        background: linear-gradient(135deg, #f59e0b, #d97706);
+        border-radius: 4px;
+        animation: tumble 1.2s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+        box-shadow: 0 0 10px rgba(217, 119, 6, 0.5);
+      }
+      @keyframes tumble {
+        0% { transform: rotate(0deg) rotateY(0deg); }
+        50% { transform: rotate(180deg) rotateY(180deg); }
+        100% { transform: rotate(360deg) rotateY(360deg); }
+      }
+      .hud-rolling-text {
+        font-size: var(--font-size-lg);
+        font-weight: 700;
+        color: var(--color-accent-gold);
+        letter-spacing: 0.05em;
+        animation: pulse 0.8s infinite alternate;
+      }
       .crit-banner {
+        display: flex;
+        align-items: center;
+        gap: 6px;
         font-size: var(--font-size-xs);
         font-weight: 800;
-        padding: 3px 10px;
+        padding: 4px 12px;
         border-radius: var(--radius-full);
-        margin-top: 4px;
+        margin-top: 6px;
         letter-spacing: 0.05em;
       }
       .crit-hit-banner {
-        background: rgba(245, 158, 11, 0.2);
+        background: linear-gradient(90deg, rgba(245, 158, 11, 0.2) 0%, rgba(251, 191, 36, 0.35) 50%, rgba(245, 158, 11, 0.2) 100%);
         color: #fbbf24;
         border: 1px solid #f59e0b;
+        box-shadow: 0 0 14px rgba(251, 191, 36, 0.4);
+        position: relative;
+        overflow: hidden;
+      }
+      .crit-hit-banner::after {
+        content: "";
+        position: absolute;
+        top: -50%;
+        left: -50%;
+        width: 200%;
+        height: 200%;
+        background: linear-gradient(60deg, transparent 40%, rgba(255, 255, 255, 0.25) 50%, transparent 60%);
+        animation: shimmer 2s infinite;
+      }
+      @keyframes shimmer {
+        0% { transform: translateX(-100%); }
+        100% { transform: translateX(100%); }
       }
       .crit-miss-banner {
-        background: rgba(225, 29, 72, 0.2);
+        background: rgba(225, 29, 72, 0.25);
         color: #fb7185;
         border: 1px solid #e11d48;
+        box-shadow: 0 0 12px rgba(225, 29, 72, 0.3);
+      }
+      .hud-formula-row {
+        background: rgba(0, 0, 0, 0.25);
+        border-radius: var(--radius-sm);
+        padding: 4px 8px;
+        margin-bottom: 8px;
+        font-family: var(--font-family-mono);
+        font-size: 0.72rem;
+        color: var(--color-text-secondary);
+        text-align: center;
       }
       .hud-breakdown {
         display: flex;

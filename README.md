@@ -1,94 +1,151 @@
-# 3D D&D Dice Roller (Windows Desktop)
+# [vCs] 3D D&D Dice Roller (Windows Desktop)
 
-A standalone Windows desktop application featuring real-time 3D polyhedral dice rolling with physical collisions, fair random number generation, dynamic dice pools, results history, and customizable tabletop environments.
+A high-performance standalone Windows desktop application featuring real-time 3D polyhedral dice rolling with physically accurate rigid-body dynamics, procedural Web Audio API collision sound synthesis, cryptographically fair random number generation, dynamic dice pool management, roll history, and rich visual customization.
+
+Feel free to make pull requests for further improvements or fork for a different direction. Add issues for any bugs.
+
+---
+
+## Highlights & Features
+
+- **Six Mathematically Accurate Polyhedral Dice:** D4 (tetrahedron), D6 (cube), D8 (octahedron), D10 (pentagonal trapezohedron with analytical golden ratio kite proportions), D12 (dodecahedron), and D20 (icosahedron).
+- **Two Distinct Geometry Styles:** Sharp Edge (crisp artisan resin with flat facets) and Rounded / Soft Edge (beveled and chamfered edges for smooth tumbling).
+- **Six PBR Materials & Themes:** Classic Ivory, Obsidian & Gold, Royal Purple Gem, Cyber Neon, Crimson Dragon, and Walnut Wood.
+- **Custom Body & Numeral Colors:** Color pickers allowing custom resin hues and numeral ink.
+- **Adjustable 3D Dice Tray:** Three containment presets (Small 11×14, Standard 15×19, Large 20×25) with 5 tray floor materials: Green Velvet, Navy Velvet, Burgundy Velvet, Dark Oak, and Stitched Leather.
+- **Dual Rolling Modes:**
+  - **Fair PRNG Target Landing (Default):** Authoritative results determined via unbiased `crypto.getRandomValues` sampling, with target landing solver and physics-guided rotational settling.
+  - **Pure Physics Simulation:** Unconstrained chaotic tumbling where the final upward-resting face determines the authoritative result.
+- **Procedural Web Audio API Sound Engine:** Zero external audio file dependencies. Synthesizes material-specific impact thuds (velvet, oak, leather), resonant die-on-die clatter, tray wall knocks, roll toss swooshes, celebratory Natural 20 major-chord fanfares, and ominous Natural 1 low-frequency descending rumbles.
+- **Dynamic Safeguards:** DynamicsCompressor anti-clipping protection, 16-voice concurrency limiting, velocity thresholds, and 28ms event cooldown preventing audio overload during large multi-dice rolls.
+- **Interactive Controls:** Left-click to add, right-click to remove, mouse raycast pickup and drag-to-toss, right-click/middle-click camera orbiting, and scroll-wheel zoom.
+- **Result HUD & History:** Roll total, structured formulas (e.g. `2d6 [4, 5] + 1d20 [20] = 29`), individual die pills, and a slide-out drawer holding the 20 most recent rolls.
+- **Persistent Preferences:** Schema-versioned LocalStorage with automatic fallback and "Reset to Defaults".
+
+---
 
 ## Technology Stack
 
-- **Desktop Shell:** Tauri 2.x with Rust & Windows WebView2
-- **Frontend Core:** Vite, TypeScript (Strict Mode)
-- **3D Graphics Engine:** Three.js
-- **Physics Engine:** Cannon-es
-- **Test Framework:** Vitest
-- **Linting & Formatting:** ESLint 9 (typescript-eslint) & Prettier
-- **Target OS:** Windows 10 / Windows 11 (64-bit)
+- **Desktop Shell:** Tauri 2.x (Rust Backend, minimal native footprint)
+- **Frontend Core:** Vite 6, TypeScript 5 (Strict Mode)
+- **3D Graphics Engine:** Three.js (WebGL PBR shaders, soft directional shadows)
+- **Physics Engine:** Cannon-es (Rigid-body dynamics with 1/60s fixed timestep and substepping)
+- **Audio Engine:** Web Audio API (Synthesized oscillators, biquad filters, and noise buffers)
+- **Test Framework:** Vitest (52 automated unit and integration tests)
+- **Code Standards:** ESLint 9 (typescript-eslint) & Prettier
+
+---
+
+## Supported Windows Versions & Runtime Requirements
+
+- **Supported Operating Systems:** Windows 10 (64-bit) & Windows 11 (64-bit).
+- **Runtime Dependency:** Microsoft Edge WebView2 Runtime.
+  - Standard and pre-installed on modern Windows 10 and all Windows 11 machines.
+  - If missing on older Windows installations, download the official evergreen bootstrapper from Microsoft.
+- **Hardware Acceleration:** DirectX 11 / WebGL-compatible graphics driver.
+- **Offline Self-Sufficiency:** The application has **zero** runtime dependency on Node.js, npm, Rust, Git, or internet connectivity. All fonts, shaders, and procedural sounds are self-contained.
+
+---
 
 ## Project Structure
 
 ```text
 DnDDiceRoller/
+├── dist/                     # Optimized frontend web bundle
+├── dist-portable/            # Portable standalone Windows executable
+│   └── DnD3DDiceRoller.exe   # Single-file portable desktop binary (~4.5 MB)
 ├── src/
-│   ├── app/              # Application lifecycle, orchestrator, bootstrap
-│   ├── audio/            # Audio manager & procedural collision sound contracts
-│   ├── config/           # Centralized configuration (settings, dice, physics)
+│   ├── app/                  # Application orchestrator and lifecycle
+│   ├── audio/                # Procedural Web Audio API sound synthesizer
+│   ├── config/               # Default settings, dice configs, physics tuning
 │   ├── core/
-│   │   ├── dice/         # Dice factory and instantiation logic
-│   │   ├── physics/      # Cannon-es physics world and tray colliders
-│   │   ├── random/       # Fair cryptographically secure random number provider
-│   │   ├── results/      # Aggregate result and critical evaluation
-│   │   └── state/        # Central AppState and localStorage persistence
+│   │   ├── dice/             # Dice factory & instance generation
+│   │   ├── physics/          # Cannon-es physics world, collision shapes & simulation
+│   │   ├── random/           # Cryptographic PRNG with unbiased rejection sampling
+│   │   ├── results/          # Result calculator & formula formatting
+│   │   └── state/            # Reactive AppState & schema-versioned persistence
 │   ├── rendering/
-│   │   ├── camera/       # Perspective camera rig with tabletop angle
-│   │   ├── geometries/   # 3D tray meshes and procedural dice geometry contracts
-│   │   ├── lighting/     # Key directional light with soft shadows and fill light
-│   │   ├── materials/    # Material factory (felt, wood, rim trim, dice shaders)
-│   │   └── scene/        # Three.js scene manager, animation loop, disposal
-│   ├── styles/           # Design tokens, dark desktop theme, glassmorphism UI
-│   ├── tests/            # Vitest unit test suites
-│   ├── types/            # Strict TypeScript contracts for dice, physics, rolls
-│   ├── ui/
-│   │   ├── components/   # DiceToolbar, ResultHud, FooterControls, HistoryDrawer
-│   │   ├── icons/        # Polyhedral dice symbols and UI glyphs
-│   │   ├── menus/        # Desktop MenuBar
-│   │   └── settings/     # Settings modal with audio, physics, and theme tabs
-│   ├── utils/            # Math and vector helper functions
-│   └── main.ts           # Frontend entry point
-├── src-tauri/            # Tauri 2 Rust desktop shell and native windowing
-├── docs/                 # Architecture, development instructions, phase tracking
-├── public/               # Static assets
+│   │   ├── camera/           # Orbiting camera rig with zoom and reset
+│   │   ├── geometries/       # Mathematical polyhedral geometry generators
+│   │   ├── interaction/      # Mouse raycasting, drag-and-throw, pointer isolation
+│   │   ├── lighting/         # Studio lighting rig with directional shadows
+│   │   ├── materials/        # PBR material factory & cache
+│   │   ├── scene/            # SceneManager, animation loop, resource cleanup
+│   │   └── textures/         # Procedural canvas texture generator & numeral engraver
+│   ├── styles/               # CSS design tokens, glassmorphism overlays
+│   ├── tests/                # Automated Vitest test suites (52 passing tests)
+│   ├── types/                # TypeScript type definitions and contracts
+│   └── ui/
+│       ├── components/       # DiceToolbar, ResultHud, FooterControls, HistoryDrawer, HelpModal
+│       ├── icons/            # Polyhedral vector SVG icons & UI symbols
+│       ├── menus/            # Desktop MenuBar (File, View, Settings, Help)
+│       └── settings/         # Preferences dialog (Physics, Models, Audio)
+├── src-tauri/                # Rust backend shell, window management, Cargo manifest
+├── docs/                     # Comprehensive architecture and user guides
+│   ├── ARCHITECTURE.md       # Full engineering architecture documentation
+│   ├── USER_GUIDE.md         # End-user guide and shortcuts
+│   ├── RELEASE.md            # Release build, packaging & distribution instructions
+│   └── PHASE_STATUS.md       # Verification status across all 5 phases
 ├── package.json
 └── tsconfig.json
 ```
 
-## Quick Start & Development
+---
 
-### Prerequisites
+## Build & Distribution Instructions
 
-- **Node.js:** v20+ LTS and npm
-- **Rust:** Stable toolchain (`x86_64-pc-windows-msvc`)
-- **C++ Build Tools:** Visual Studio C++ Build Tools & Windows SDK
-- **Edge WebView2 Runtime:** Standard on Windows 10/11
+### 1. Developer Setup
 
-*Note: On this development environment, toolchains are configured on the `F:` drive (`F:\tools\nodejs`, `F:\tools\cargo`, `F:\tools\git`).*
-
-### Commands
+Ensure you have Node.js (v20+ LTS) and the Rust toolchain (`x86_64-pc-windows-msvc`) installed:
 
 ```powershell
-# Install frontend dependencies
+# Install dependencies
 npm install
 
-# Run TypeScript compilation check
-npm run build
-
-# Run unit tests
+# Run automated test suites (52 tests across 8 suites)
 npm test
 
-# Run ESLint
+# Run linter
 npm run lint
 
-# Check formatting
+# Check code formatting
 npm run format:check
 
-# Start Vite frontend development server
+# Run frontend dev server
 npm run dev
-
-# Launch full Tauri desktop application
-npm run tauri dev
 ```
 
-## Roadmap
+### 2. Building the Standalone Portable Executable
 
-- [x] **Phase 1:** Application Foundation, Modular Architecture & 3D Tray Shell
-- [ ] **Phase 2:** Polyhedral Dice Geometries (D4, D6, D8, D10, D12, D20) & Face Reading
-- [ ] **Phase 3:** Full Rigid Body Dynamics, Throw Impulses & Collision Detection
-- [ ] **Phase 4:** Procedural Sound Synthesis & Custom Visual Themes
-- [ ] **Phase 5:** Portable Windows Executable Distribution & Final Polish
+To compile the single-file standalone executable without installers:
+
+```powershell
+npm run build:release
+```
+
+This compiles:
+- Frontend assets into `dist/` (HTML/CSS/JS bundled locally).
+- The optimized Rust desktop shell into `src-tauri/target/release/dnd_dice_roller.exe` (or `dist-portable/DnD3DDiceRoller.exe`).
+
+### 3. Building Installers (MSI & NSIS)
+
+To build standard Windows installer packages:
+
+```powershell
+npx tauri build
+```
+
+This produces:
+- `src-tauri/target/release/bundle/msi/DnD 3D Dice Roller_1.0.0_x64_en-US.msi` (2.21 MB)
+- `src-tauri/target/release/bundle/nsis/DnD 3D Dice Roller_1.0.0_x64-setup.exe` (1.50 MB)
+
+---
+
+## Verification & Status
+
+All 5 development phases are complete and verified:
+- [x] **Phase 1:** Application Foundation & 3D Tray Shell
+- [x] **Phase 2:** Polyhedral 3D Dice Geometries, Numbering & PBR Materials
+- [x] **Phase 3:** Rigid Body Physics, Collisions & Target Landing
+- [x] **Phase 4:** Desktop User Experience, SVG Icons, Drawer & Preferences
+- [x] **Phase 5:** Procedural Audio Synthesis, Release Hardening & Portable Packaging

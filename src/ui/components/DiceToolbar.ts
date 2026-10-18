@@ -2,6 +2,7 @@ import type { AppState } from "@/core/state/AppState";
 import { DICE_CONFIGS } from "@/config/diceConfig";
 import { DICE_THEMES } from "@/config/themeConfig";
 import type { DiceGeometryStyle, DiceThemeId, DiceType } from "@/types";
+import { DICE_SVGS, UI_ICONS } from "@/ui/icons";
 
 export class DiceToolbar {
   readonly element: HTMLElement;
@@ -38,24 +39,26 @@ export class DiceToolbar {
         <span class="label-title">DICE TRAY SELECTOR</span>
         <span class="label-hint">Left-click: +1 • Right-click: -1 • Drag dice to rotate</span>
       </div>
-      <div class="dice-buttons-group">
+      <div class="dice-buttons-group" role="toolbar" aria-label="Dice Selection Toolbar">
         ${diceTypes
           .map((type) => {
             const config = DICE_CONFIGS[type];
             const count = pool.counts[type] || 0;
+            const badgeText = count > 0 ? `${config.label} ×${count}` : "0";
             return `
               <button 
-                class="dice-btn dice-btn-${type}" 
+                class="dice-btn dice-btn-${type} ${count > 0 ? "is-active" : ""}" 
                 data-type="${type}" 
-                title="Add ${config.label} (${config.faceCount} sides) to Tray (Right click to remove)"
+                title="${config.label} (${config.faceCount} sides): Left-click to add, Right-click to remove"
+                aria-label="${config.label}, ${count} currently in tray. Left click to add, right click to remove."
                 type="button"
               >
                 <div class="dice-icon-wrapper">
-                  <span class="dice-icon-symbol">${this.getIconSymbol(type)}</span>
+                  <span class="dice-svg-container" aria-hidden="true">${DICE_SVGS[type]}</span>
                   <span class="dice-type-name">${config.label}</span>
                 </div>
-                <span class="dice-count-badge ${count > 0 ? "has-dice" : ""}" data-count-for="${type}">
-                  ${count}
+                <span class="dice-count-badge ${count > 0 ? "has-dice" : ""}" data-count-for="${type}" aria-hidden="true">
+                  ${badgeText}
                 </span>
               </button>
             `;
@@ -64,13 +67,13 @@ export class DiceToolbar {
       </div>
       <div class="toolbar-controls-right">
         <!-- Style Toggle -->
-        <div class="style-toggle-group" title="Switch 3D geometric style between Sharp and Rounded edges">
-          <button class="style-btn ${currentStyle === "sharp" ? "active" : ""}" data-style="sharp" type="button">Sharp</button>
-          <button class="style-btn ${currentStyle === "rounded" ? "active" : ""}" data-style="rounded" type="button">Rounded</button>
+        <div class="style-toggle-group" title="Switch 3D geometric style between Sharp and Rounded edges" role="radiogroup" aria-label="Dice Edge Profile">
+          <button class="style-btn ${currentStyle === "sharp" ? "active" : ""}" data-style="sharp" type="button" role="radio" aria-checked="${currentStyle === "sharp"}">Sharp</button>
+          <button class="style-btn ${currentStyle === "rounded" ? "active" : ""}" data-style="rounded" type="button" role="radio" aria-checked="${currentStyle === "rounded"}">Rounded</button>
         </div>
 
         <!-- Theme Selector -->
-        <select class="theme-select-input" id="quickThemeSelect" title="Select dice material and texture theme">
+        <select class="theme-select-input" id="quickThemeSelect" title="Select dice material and texture theme" aria-label="Quick Theme Selector">
           ${Object.values(DICE_THEMES)
             .map(
               (t) => `
@@ -80,28 +83,12 @@ export class DiceToolbar {
             .join("")}
         </select>
 
-        <button class="quick-clear-btn" type="button" title="Clear all dice from the tray">
-          Clear
+        <button class="quick-clear-btn" type="button" title="Clear all dice from the tray" aria-label="Clear all dice">
+          <span class="btn-clear-icon" aria-hidden="true">${UI_ICONS.trash}</span>
+          <span>Clear All</span>
         </button>
       </div>
     `;
-  }
-
-  private getIconSymbol(type: DiceType): string {
-    switch (type) {
-      case "d4":
-        return "▲";
-      case "d6":
-        return "◼";
-      case "d8":
-        return "◆";
-      case "d10":
-        return "⬟";
-      case "d12":
-        return "⬢";
-      case "d20":
-        return "⬡";
-    }
   }
 
   private setupListeners(): void {
@@ -153,16 +140,26 @@ export class DiceToolbar {
 
   private updateCounts(): void {
     const pool = this.appState.getDicePoolState();
-    const badges = this.element.querySelectorAll<HTMLElement>("[data-count-for]");
-    badges.forEach((badge) => {
-      const type = badge.dataset.countFor as DiceType;
+    const diceButtons = this.element.querySelectorAll<HTMLButtonElement>(".dice-btn");
+    diceButtons.forEach((btn) => {
+      const type = btn.dataset.type as DiceType;
       const count = pool.counts[type] || 0;
-      badge.textContent = String(count);
-      if (count > 0) {
-        badge.classList.add("has-dice");
-      } else {
-        badge.classList.remove("has-dice");
+      const config = DICE_CONFIGS[type];
+      const badge = btn.querySelector<HTMLElement>("[data-count-for]");
+      if (badge) {
+        badge.textContent = count > 0 ? `${config.label} ×${count}` : "0";
+        if (count > 0) {
+          badge.classList.add("has-dice");
+          btn.classList.add("is-active");
+        } else {
+          badge.classList.remove("has-dice");
+          btn.classList.remove("is-active");
+        }
       }
+      btn.setAttribute(
+        "aria-label",
+        `${config.label}, ${count} currently in tray. Left click to add, right click to remove.`
+      );
     });
   }
 
@@ -234,20 +231,31 @@ export class DiceToolbar {
       .dice-btn:active {
         transform: translateY(0);
       }
+      .dice-btn.is-active {
+        border-color: rgba(217, 119, 6, 0.4);
+      }
       .dice-icon-wrapper {
         display: flex;
         align-items: center;
         gap: 6px;
       }
-      .dice-icon-symbol {
-        font-size: var(--font-size-sm);
+      .dice-svg-container {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 22px;
+        height: 22px;
       }
-      .dice-btn-d4 .dice-icon-symbol { color: var(--dice-color-d4); }
-      .dice-btn-d6 .dice-icon-symbol { color: var(--dice-color-d6); }
-      .dice-btn-d8 .dice-icon-symbol { color: var(--dice-color-d8); }
-      .dice-btn-d10 .dice-icon-symbol { color: var(--dice-color-d10); }
-      .dice-btn-d12 .dice-icon-symbol { color: var(--dice-color-d12); }
-      .dice-btn-d20 .dice-icon-symbol { color: var(--dice-color-d20); font-size: 1.1rem; }
+      .dice-svg-container svg {
+        width: 100%;
+        height: 100%;
+      }
+      .dice-btn-d4 .dice-svg-container { color: var(--dice-color-d4, #f87171); }
+      .dice-btn-d6 .dice-svg-container { color: var(--dice-color-d6, #60a5fa); }
+      .dice-btn-d8 .dice-svg-container { color: var(--dice-color-d8, #34d399); }
+      .dice-btn-d10 .dice-svg-container { color: var(--dice-color-d10, #fbbf24); }
+      .dice-btn-d12 .dice-svg-container { color: var(--dice-color-d12, #c084fc); }
+      .dice-btn-d20 .dice-svg-container { color: var(--dice-color-d20, #f43f5e); }
 
       .dice-type-name {
         font-weight: 700;
@@ -263,6 +271,7 @@ export class DiceToolbar {
         color: var(--color-text-muted);
         min-width: 20px;
         text-align: center;
+        white-space: nowrap;
       }
       .dice-count-badge.has-dice {
         background: var(--color-accent-gold);
@@ -313,6 +322,9 @@ export class DiceToolbar {
         border-color: var(--color-accent-gold);
       }
       .quick-clear-btn {
+        display: flex;
+        align-items: center;
+        gap: 6px;
         padding: 5px 12px;
         font-size: var(--font-size-xs);
         font-weight: 600;
@@ -320,6 +332,10 @@ export class DiceToolbar {
         border: 1px solid var(--color-border-subtle);
         border-radius: var(--radius-sm);
         transition: all var(--transition-fast);
+      }
+      .btn-clear-icon {
+        display: flex;
+        align-items: center;
       }
       .quick-clear-btn:hover {
         background: rgba(225, 29, 72, 0.15);
